@@ -896,6 +896,7 @@ create_response_vars <- function(pos,
     unique()
 
   finished.responses <- dplyr::bind_rows(type1, type2, type3) |>
+  finished.responses <- dplyr::bind_rows(type1, type2, type3) |>
     dplyr::group_by(epid, ntchanges, emergencegroup) |>
     dplyr::mutate(finished.responses = n()) |>
     dplyr::ungroup() |>
@@ -1986,6 +1987,7 @@ process_spatial <- function(gdb_folder,
   }
 
   long.global.prov.01 <- dplyr::bind_rows(df.list)
+  long.global.prov.01 <- dplyr::bind_rows(df.list)
   cli::cli_process_start("Evaluating overlapping province shapes")
 
   if (endyr == lubridate::year(format(Sys.time())) & startyr == 2000) {
@@ -2035,6 +2037,7 @@ process_spatial <- function(gdb_folder,
     df.list[[i]] <- df02
   }
 
+  long.global.dist.01 <- dplyr::bind_rows(df.list)
   long.global.dist.01 <- dplyr::bind_rows(df.list)
 
   cli::cli_process_start("Evaluating overlapping district shapes")
@@ -4922,6 +4925,7 @@ s2_process_coordinates <- function(data, polis_data_folder, polis_folder,
     data_deduped <- dup_epid_fixed |>
       dplyr::select(-c("epid", "dup_epid")) |>
       dplyr::rename(epid = epid_fixed) |>
+      dplyr::bind_rows(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
       dplyr::bind_rows(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
 
 
