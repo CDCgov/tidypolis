@@ -860,9 +860,10 @@ create_response_vars <- function(pos,
   # cVDPV1 <- tOPV / bOPV / mOPV1
   # cVDPV3 <- tOPV / bOPV / mOPV3
   type1 <- dplyr::left_join(pos.sub |> dplyr::filter(measurement == "cVDPV 1"),
-    sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "bOPV", "mOPV1")),
-    by = c("admin2guid" = "adm2guid")
-  ) |>
+                            sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "bOPV", "mOPV1")),
+                            by = c("admin2guid" = "adm2guid"),
+                            relationship = "many-to-many"
+                            ) |>
     dplyr::mutate(time.to.response = difftime(sub.activity.start.date, dateonset, units = "days")) |>
     dplyr::filter(
       sub.activity.start.date < Sys.Date(),
@@ -872,9 +873,9 @@ create_response_vars <- function(pos,
     unique()
 
   type2 <- dplyr::left_join(pos.sub |> dplyr::filter(measurement == "cVDPV 2"),
-    sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "nOPV2", "mOPV2")),
-    by = c("admin2guid" = "adm2guid")
-  ) |>
+                            sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "nOPV2", "mOPV2")),
+                            by = c("admin2guid" = "adm2guid"),
+                            relationship = "many-to-many") |>
     dplyr::mutate(time.to.response = difftime(sub.activity.start.date, dateonset, units = "days")) |>
     dplyr::filter(
       sub.activity.start.date < Sys.Date(),
@@ -884,9 +885,9 @@ create_response_vars <- function(pos,
     unique()
 
   type3 <- dplyr::left_join(pos.sub |> dplyr::filter(measurement == "cVDPV 3"),
-    sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "bOPV", "mOPV3")),
-    by = c("admin2guid" = "adm2guid")
-  ) |>
+                            sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "bOPV", "mOPV3")),
+                            by = c("admin2guid" = "adm2guid"),
+                            relationship = "many-to-many") |>
     dplyr::mutate(time.to.response = difftime(sub.activity.start.date, dateonset, units = "days")) |>
     dplyr::filter(
       sub.activity.start.date < Sys.Date(),
@@ -916,12 +917,10 @@ create_response_vars <- function(pos,
     dplyr::mutate(planned.campaigns = n()) |>
     dplyr::ungroup()
 
-  planned.responses <- dplyr::left_join(pos.sub, planned.sia |> dplyr::select(
-    adm2guid, planned.campaigns,
-    sub.activity.start.date
-  ),
-  by = c("admin2guid" = "adm2guid")
-  ) |>
+  planned.responses <- dplyr::left_join(pos.sub, planned.sia |> dplyr::select(adm2guid, planned.campaigns,
+                                                                              sub.activity.start.date),
+                                        by = c("admin2guid" = "adm2guid"),
+                                        relationship = "many-to-many") |>
     dplyr::mutate(planned.campaigns = ifelse(is.na(planned.campaigns), 0, planned.campaigns)) |>
     unique() |>
     dplyr::select(epid, dateonset, ntchanges, emergencegroup, planned.campaigns, sub.activity.start.date) |>
@@ -929,15 +928,13 @@ create_response_vars <- function(pos,
 
   # identify completed ipv campaigns
   ipv.response <- dplyr::left_join(pos.sub,
-    sia.sub |>
-      dplyr::filter(vaccine.type == "IPV") |>
-      dplyr::select(sub.activity.start.date, adm2guid),
-    by = c("admin2guid" = "adm2guid")
-  ) |>
-    dplyr::filter(
-      dateonset < sub.activity.start.date,
-      difftime(sub.activity.start.date, dateonset, units = "days") <= 180
-    ) |>
+                                   sia.sub |>
+                                     dplyr::filter(vaccine.type == "IPV") |>
+                                     dplyr::select(sub.activity.start.date, adm2guid),
+                                   by = c("admin2guid" = "adm2guid"),
+                                   relationship = "many-to-many") |>
+    dplyr::filter(dateonset < sub.activity.start.date,
+                  difftime(sub.activity.start.date, dateonset, units = "days") <= 180) |>
     dplyr::group_by(epid, ntchanges, emergencegroup, admin2guid) |>
     dplyr::mutate(ipv.campaigns = n()) |>
     dplyr::ungroup() |>
@@ -953,7 +950,12 @@ create_response_vars <- function(pos,
       ipv.campaigns = ifelse(is.na(ipv.campaigns), 0, ipv.campaigns)
     )
 
-  pos.final <- dplyr::left_join(pos, pos.sub.03) |>
+  pos.final <- dplyr::left_join(pos, pos.sub.03,
+                                c("epid", "dateonset", "place.admin.0",
+                                  "place.admin.1", "place.admin.2", "adm0guid",
+                                  "yronset", "adm1guid", "admin2guid",
+                                  "ntchanges", "emergencegroup", "measurement"),
+                                relationship = "many-to-many") |>
     dplyr::select(-sub.activity.start.date) |>
     unique()
 
@@ -1346,14 +1348,13 @@ preprocess_cdc <- function(polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
   # Step 5 - Creating Virus datasets ====
   cli::cli_h1("Step 5/5 - Creating Virus datasets")
 
-  s5_fully_process_pos_data(
-    polis_folder = polis_folder,
-    polis_data_folder = polis_data_folder,
-    latest_folder_in_archive,
-    long.global.dist.01,
-    output_folder_name = output_folder_name,
-    output_format = output_format
-  )
+  s5_fully_process_pos_data(polis_folder = polis_folder,
+                            polis_data_folder = polis_data_folder,
+                            latest_folder_in_archive,
+                            long.global.dist.01,
+                            output_folder_name = output_folder_name,
+                            output_format = output_format,
+                            archive = archive)
 
   update_polis_log(
     .event = "Processing of CORE datafiles complete",
@@ -7503,7 +7504,9 @@ s4_es_write_data <- function(polis_data_folder, es.05, output_folder_name, outpu
 #' @param output_folder_name `str` Name of the output directory where processed
 #'        files will be saved. Defaults to "Core_Ready_Files". For
 #'        region-specific processing, this should be set to
-#'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
+#'        "Core_Ready_Files_[REGION]" (e.g., "Core_Ready_Files_AFRO").
+#' @param archive Logical. Whether to archive previous output directories
+#'    before overwriting. Default is `TRUE`.
 #'
 #'   validation.
 #' @param output_format `str` output_format to save files as.
@@ -7518,11 +7521,10 @@ s5_fully_process_pos_data <- function(polis_folder,
                                       long.global.dist.01,
                                       polis_data_folder = file.path(polis_folder, "data"),
                                       output_folder_name,
-                                      output_format) {
-  virus.raw.new <- s5_pos_load_data(
-    polis_data_folder, latest_folder_in_archive,
-    output_folder_name
-  )
+                                      output_format, archive) {
+
+  virus.raw.new <- s5_pos_load_data(polis_data_folder, latest_folder_in_archive,
+                                    output_folder_name)
   virus.01 <- s5_pos_create_cdc_vars(virus.raw.new, polis_folder, polis_data_folder)
 
   s5_pos_check_duplicates(virus.01, polis_data_folder, output_folder_name)
@@ -7550,11 +7552,12 @@ s5_fully_process_pos_data <- function(polis_folder,
 
   rm(afp.es.virus.02)
 
+  if (archive) {
   s5_pos_compare_with_archive(afp.es.virus.01, afp.es.virus.03,
-    polis_data_folder, latest_folder_in_archive,
-    output_folder_name = output_folder_name,
-    output_format = output_format
-  )
+                              polis_data_folder, latest_folder_in_archive,
+                              output_folder_name = output_folder_name,
+                              output_format = output_format)
+  }
 
   s5_pos_evaluate_unmatched_guids(afp.es.virus.03, long.global.dist.01,
     polis_data_folder,
