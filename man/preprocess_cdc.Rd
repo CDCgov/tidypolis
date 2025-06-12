@@ -18,9 +18,9 @@ preprocess_cdc(
 \item{who_region}{\code{str} optional WHO region to filter data
 Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.}
 
-\item{output_format}{\code{str} output_format to save files as.
-Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
-'parquet'.}
+\item{output_format}{str: output_format to save files as.
+Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
+'rds'.}
 
 \item{archive}{Logical. Whether to archive previous output directories
 before overwriting. Default is \code{TRUE}.}

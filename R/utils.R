@@ -1127,7 +1127,7 @@ check_missingness <- function(data,
 #' Process POLIS data into analytic datasets needed for CDC
 #' @param polis_folder `str` location of the POLIS data folder
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'parquet'.
 #' @param who_region `str` optional WHO region to filter data
 #'      Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.
@@ -1153,8 +1153,8 @@ preprocess_cdc <- function(polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
   }
 
   # validate output_format
-  if (!output_format %in% c(".rds", ".rda", ".csv", ".parquet")) {
-    stop("Currently, only 'rds', 'rda', 'csv', and 'parquet' are supported.")
+  if (!output_format %in% c(".rds", ".rda", ".csv", ".qs", ".parquet")) {
+    stop("Currently, only 'rds', 'rda', 'csv', 'qs',  and 'parquet' are supported.")
   }
 
   # ensure leading dot
@@ -2474,7 +2474,7 @@ check_missing_static_files <- function(core_files_folder_path,
 #' @param who_region `str` optional WHO region to filter data
 #'      Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #' @param archive Logical. Whether to archive previous output directories
 #'    before overwriting. Default is `TRUE`.
@@ -3501,7 +3501,7 @@ s1_create_change_log <- function(polis_data_folder,
 #'        region-specific processing, this should be set to
 #'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #' @returns NULL
 #' @keywords internal
@@ -3510,7 +3510,7 @@ s1_archive_old_files <- function(polis_data_folder, timestamp, output_folder_nam
   cli_process_start("Archiving old files")
   most_recent_files_01 <- s1_get_most_recent_files(
     polis_data_folder,
-    c(".rds", ".rda", ".csv", ".xlsx", ".parquet"),
+    c(".rds", ".rda", ".csv", ".xlsx", ".qs", ".parquet"),
     output_folder_name
   )
 
@@ -3560,7 +3560,7 @@ s1_archive_old_files <- function(polis_data_folder, timestamp, output_folder_nam
 #'        region-specific processing, this should be set to
 #'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #'
 #' @returns `NULL`
@@ -3708,7 +3708,7 @@ s2_trim_archives <- function(polis_data_folder, output_folder_name, keep_n = 3) 
 #'        region-specific processing, this should be set to
 #'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #' @param archive Logical. Whether to archive previous output directories
 #'    before overwriting. Default is `TRUE`.
@@ -5201,7 +5201,7 @@ s2_create_afp_variables <- function(data) {
 #'        region-specific processing, this should be set to
 #'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #' @param archive Logical. Whether to archive previous output directories
 #'    before overwriting. Default is `TRUE`.
@@ -5723,7 +5723,7 @@ s2_compare_with_archive <- function(data,
 #'        region-specific processing, this should be set to
 #'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #'
 #' @export
@@ -6322,7 +6322,7 @@ s3_sia_check_metadata <- function(sia.06, polis_data_folder, latest_folder_in_ar
 #'        region-specific processing, this should be set to
 #'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #'
 #' @returns NULL
@@ -6788,7 +6788,7 @@ s3_sia_evaluate_unmatched_guids <- function(sia.05, polis_data_folder, output_fo
 #'        region-specific processing, this should be set to
 #'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #'
 #' @export
@@ -7451,7 +7451,7 @@ s4_es_check_metadata <- function(polis_data_folder, es.05,
 #'        region-specific processing, this should be set to
 #'        "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #'
 #' @returns `NULL` invisible return with write out to logs if necessary
@@ -7510,7 +7510,7 @@ s4_es_write_data <- function(polis_data_folder, es.05, output_folder_name, outpu
 #'
 #'   validation.
 #' @param output_format `str` output_format to save files as.
-#'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+#'    Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 #'    'rds'.
 #'
 #' @returns `NULL` quietly upon success.
