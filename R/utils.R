@@ -478,6 +478,7 @@ f.download.compare.02 <- function(df.from.f.download.compare.01,
   }
 }
 
+>>>>>>> f5869e5 (Use qs2 and drop redundant line)
 #' Function for data qa check in AFP line list cleaning
 #' @description function creates a new variable when combined with a mutate statement in R code
 #' @param date1 date 1 is the date to be checked against date2
