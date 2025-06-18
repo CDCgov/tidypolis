@@ -4078,30 +4078,36 @@ s2_standardize_dates <- function(data) {
       admin2guid = admin.2.guid
     ) |>
     dplyr::mutate(
-      dateonset = lubridate::as_date(
-        lubridate::ymd_hms(date.onset, tz = "UTC", quiet = TRUE)
+      dateonset = lubridate::ymd(
+        as.Date(date.onset, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        quiet = TRUE
       ),
-      datenotify = lubridate::as_date(
-        lubridate::ymd_hms(notification.date, tz = "UTC", quiet = TRUE)
+      datenotify = lubridate::ymd(
+        as.Date(notification.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        quiet = TRUE
       ),
-      dateinvest = lubridate::as_date(
-        lubridate::ymd_hms(investigation.date, tz = "UTC", quiet = TRUE)
+      dateinvest = lubridate::ymd(
+        as.Date(investigation.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        quiet = TRUE
       ),
-      datestool1 = lubridate::as_date(
-        lubridate::ymd_hms(`stool.1.collection.date`, tz = "UTC",
-                           quiet = TRUE)
+      datestool1 = lubridate::ymd(
+        as.Date(stool.1.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        quiet = TRUE
       ),
-      datestool2 = lubridate::as_date(
-        lubridate::ymd_hms(`stool.2.collection.date`, tz = "UTC",
-                           quiet = TRUE)
+      datestool2 = lubridate::ymd(
+        as.Date(stool.2.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        quiet = TRUE
       ),
-      followup.date = lubridate::as_date(
-        lubridate::ymd_hms(followup.date, tz = "UTC", quiet = TRUE)
+      followup.date = lubridate::ymd(
+        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        quiet = TRUE
       ),
-      yronset = dplyr::coalesce(
-        lubridate::year(dateonset),
-        lubridate::year(datestool1),
-        lubridate::year(datenotify)
+      yronset = lubridate::year(dateonset),
+      yronset = dplyr::if_else(is.na(yronset),
+                               lubridate::year(datestool1), yronset
+      ),
+      yronset = dplyr::if_else(is.na(datestool1) & is.na(yronset),
+                               lubridate::year(datenotify), yronset
       ),
       age.months = as.numeric(`calculated.age.(months)`),
       ontostool1 = as.numeric(datestool1 - dateonset),
@@ -4121,7 +4127,7 @@ s2_standardize_dates <- function(data) {
           "case.date", "stool.date.sent.to.lab",
           "clinical.admitted.date", "followup.date"
         )),
-        ~ lubridate::ymd(as.Date(., "%Y-%m-%dT%H:%M:%S"), quiet = TRUE)
+        ~ lubridate::ymd(as.Date(., tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")), quiet = TRUE)
       )
     ) |>
     dplyr::mutate(datenotificationtohq = date.notification.to.hq,
@@ -5039,7 +5045,7 @@ s2_create_afp_variables <- function(data) {
       ),
       # Re-parse followup date to ensure consistency
       followup.date = lubridate::ymd(
-        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"))
+        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y"))
       ),
 
       # Additional date quality flags
