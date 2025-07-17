@@ -22,17 +22,17 @@ ipv_only <- c("CANADA", "GERMANY", "FINLAND", "ISRAEL", "POLAND" , "SPAIN", "UKR
 start.date <- lubridate::as_date("2016-01-01")
 
 end.date <-   lubridate::floor_date(lubridate::today())
+outbreak_window <- 365
 
 
-
-set_parameters( breakthrough_min_date = 21,
-                breakthrough_middle_date = 180,
-                breakthrough_max_date = 365,
-                detection_pre_sia_date = 90,
-                start_date = start.date,
-                end_date = end.date,
-                recent_sia_start_year = lubridate::year(Sys.Date())-2)
-                #This is used to restrict "Recent SIA with breakthrough transmission" figures to 'recent' SIAs in f.geompoint.case())
+# set_parameters( breakthrough_min_date = 21,
+#                 breakthrough_middle_date = 180,
+#                 breakthrough_max_date = 365,
+#                 detection_pre_sia_date = 90,
+#                 start_date = start.date,
+#                 end_date = end.date,
+#                 recent_sia_start_year = lubridate::year(Sys.Date())-2)
+#                 #This is used to restrict "Recent SIA with breakthrough transmission" figures to 'recent' SIAs in f.geompoint.case())
 
 # AFP - 3543 / Post-AFP 3561 (8)
 # ENV has 236 duplicates in Post
@@ -79,7 +79,7 @@ df_sec <- positives.clean.01 |>
                      "TRUE", "FALSE"),
     ob_diff = dateonset - dplyr::lag(dateonset, default = dplyr::first(dateonset))) |>
   dplyr::filter((
-    (ob_flag == "TRUE" & ob_diff > 395))) |>
+    (ob_flag == "TRUE" & ob_diff > outbreak_window))) |>
   dplyr:: filter(is.na(emergencegroup)==F)
 
 
@@ -125,7 +125,7 @@ df_first <- positives.clean.01 |>
     diff = dateonset - dplyr::lag(dateonset, default = dplyr::first(dateonset))) |>
   dplyr::filter((dplyr::row_number()==1) |
            ob_flag == "FALSE" |
-           (ob_flag == "TRUE" & diff > 395)) |>
+           (ob_flag == "TRUE" & diff > outbreak_window)) |>
   dplyr::filter(is.na(emergencegroup)==F) |>
   dplyr::group_by(place.admin.0, measurement) |>
   dplyr::mutate(ob_count = dplyr::row_number(),
@@ -284,18 +284,24 @@ rm(ob_epi, op_epi2)
 # Tidy up data set
 df_all <- df_all |> dplyr::select(ob_cat, ob_status, fv_yr, everything() )
 
+
+# Sen check - should we use 12 months or 13 months
+  # idea is to use 12 months but wait until 13 months have passed in order to ensure
+
+
 ### Add in SIA data now - #
 sia_data  <- raw.data$sia |>
   dplyr::filter(yr.sia >= lubridate::year(start.date) &
                   status == "Done")
 ob_sias <- list()
+sia_rds1 <- list()
 
 # To move later
 cov_pct_lvl <- 6
 
 for (i in 1:nrow(df_all)){
 
-# x <- "PNG-cVDPV1-1"
+# x <- "MOZ-cVDPV2-2"
 x <- df_all$ob_id[i]
 df_sub <- df_all |> dplyr::filter(ob_id == x)
 
@@ -383,31 +389,73 @@ if(sero == "cVDPV 2"){
 }
 
 
-sia_sub <-  dplyr::left_join(sia_sub, pop, by = "adm2guid")
+# Need to reduce here the number of SIAs. Examples of the same SIA code having multiple activity types with the same master code. Some are Mop-ups, others SIA dates
+# Saving grace no duplicated admin 2 levels on each activity date. So will spread out we can combine all here
+# may need to add in a list here for what SIA codes are in the main one
 
-# Quality check to pull out mop-ups or R0 that are not codeded as such
-sia_rds <- sia_sub |>
-  dplyr::arrange(sia.code, activity.start.date) |>
-  dplyr::group_by(sia.code) |>
+sia_sub2 <-  dplyr::left_join(sia_sub, pop, by = "adm2guid")
+
+
+sia_sub2 <- sia_sub2 |>
+  dplyr::filter(!activity.type == "Mop-Up") |>
+  dplyr::mutate(activity.start.date = lubridate::as_date(activity.start.date),
+                activity.end.date = lubridate::as_date(activity.end.date),
+                sia_length = activity.end.date - activity.start.date) |>
+  dplyr::arrange(activity.start.date, sia.code) |>
+  dplyr::group_by(activity.start.date) |>
   dplyr::summarise(
+    adm2guid = dplyr::first(adm2guid),
+    sia_code = dplyr::first(sia.code), # keep only first sia.code to match
+    code_count = dplyr::n_distinct(sia.code),
     sia_dist = dplyr::n_distinct(place.admin.2),
-    cov_pct_dist = sia_dist / dist_c * 100,
     sia_prov = dplyr::n_distinct(place.admin.1),
-    cov_pct_prov = sia_prov / prov_c * 100,
     sia_type = dplyr::first(activity.type),
-    cdc.round.num = dplyr::first(cdc.round.num),
-    cdc.max.round = dplyr::first(cdc.max.round),
-    cdc.last.camp = dplyr::first(cdc.last.camp),
-    sia_date = dplyr::first(activity.start.date),
     tot_kids = sum(u15pop, na.rm = T),
-    pct_kids_tar = tot_kids /tpop_u15 * 100,
-    ob_R0 = dplyr::if_else(sia_date <= (ob_start + lubridate::days(14)), "Y", "N"))
+    sia_date = dplyr::first(activity.start.date),
+    sia_length = median(sia_length, na.rm =T)) |>
+  dplyr::select(-activity.start.date, -adm2guid)
 
-# Pull out total number of SIA coded rounds:
+
+# Quality check to pull out mop-ups or R0 that are not codded as such
+# Pull in last date calculation - # Same approach as R0 as going into break through - wanted to remove small rounds such as R0 or Mop-Ups; bigger ones to stay in
+
+sia_rds <- sia_sub2 |>
+  dplyr::arrange(sia_date) |>
+  dplyr::mutate(
+    ob_id = x,
+    cov_pct_dist = sia_dist / dist_c * 100,
+    cov_pct_prov = sia_prov / prov_c * 100,
+    pct_kids_tar = round(tot_kids /tpop_u15 * 100)) |>
+  dplyr::arrange(sia_date) |>
+  # Add in time difference in SIAS
+  dplyr::mutate(
+    sia_no = dplyr::row_number(),
+    ob_R0 = dplyr::if_else(sia_date <= (ob_start + lubridate::days(14)), "Y", "N"),
+    ob_R0_test = dplyr::if_else(sia_no == 1 & tot_kids < 400000 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl , "Y", "N"),
+    sia_time_diff = sia_date - dplyr::lag(sia_date, default= ob_start),
+    # sia_check = dplyr::case_when(
+    #  ob_R0 == "N" & (sia_type %in% c("SNID", "NID") |
+    #       (sia_type == "CR" & cov_pct_dist >= cov_pct_lvl) |
+    #       (sia_type == "CR" & cov_pct_dist < cov_pct_lvl & tot_kids > 400000)) ~  "N",
+    # TRUE ~ "Y"),
+    mopup_check = dplyr::case_when(
+      sia_type == "Mop-Up" ~ "Y",
+      dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl & tot_kids < 400000 & sia_time_diff <= 21 ~ "Y",
+      dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl & pct_kids_tar > 10 & sia_time_diff <= 21 ~ "Y",
+      TRUE ~ "N"),
+    sia_cat = dplyr::case_when(
+      ob_R0 == "Y" ~ "1_R0",
+      mopup_check == "Y" ~ "3_mop-up",
+      TRUE ~ "2_siard")) |>
+  dplyr::arrange(sia_date, sia_cat)
+
+
+# # Pull out total number of SIA coded rounds:
 sia_out <- sia_rds |>
+  # dplyr::filter(!sia_cat == "1_R0") |>
   dplyr::summarise(
     id = x,
-    tot_rds = dplyr::n(),
+    tot_rds_dataset = dplyr::n(),
     sia_first = dplyr::first(sia_date),
     sia_last = dplyr::last(sia_date))
 
@@ -416,40 +464,64 @@ sia_out <- sia_rds |>
 # # Focus on SNID / NIDS and CRS that do not appear as
 # Pull out any that do not cover
 # Some R0 can be big agains the
-sia_out2 <-    sia_rds |>
-  dplyr::filter(ob_R0 == "N" &
-                  (sia_type %in% c("SNID", "NID") |
-                  (sia_type == "CR" &
-                  cov_pct_dist >= cov_pct_lvl) |
-                  (sia_type == "CR" &
-                     cov_pct_dist < cov_pct_lvl &
-                     tot_kids > 400000))) |>
+sia_out2 <-  sia_rds |>
+  dplyr::filter(sia_cat =="2_siard" ) |>
          dplyr::summarise(
            id = x,
-           reg_rds = dplyr::n(),
+           snids_rds = dplyr::n(),
            first_reg_sia = dplyr::first(sia_date),
            sec_reg_sia = dplyr::nth(sia_date, 2),
-           thr_reg_sia = dplyr::nth(sia_date, 3),
-           forth_reg_sia = dplyr::nth(sia_date, 4),
+           thrd_reg_sia = dplyr::nth(sia_date, 3),
            last_reg_sia = dplyr::last(sia_date))
 
 sia_out <- dplyr::left_join(sia_out, sia_out2, by = "id")
+
+
+sia_rds1[[i]] <- sia_rds
 ob_sias[[i]] <- sia_out
 # rm(ob_check, ob_data, ob_viruses, df_sub)
+
 
 }
 
 ob_sias_all <- do.call(rbind, ob_sias)
+sia_rds_all <- do.call(rbind, sia_rds1)
 
 
-df_all <- dplyr::left_join(df_all, ob_sias_all, by = c("ob_id"="id"))
+df_all2 <- dplyr::left_join(df_all, ob_sias_all, by = c("ob_id"="id"))
 
 
-df_all <- df_all |>
+df_all2 <- df_all2 |>
              dplyr::mutate(ipv_ctry = dplyr::if_else(ob_country %in% ipv_only, "IPV Only", NA_character_))
 
 
-writexl::write_xlsx(df_all, path = "obx_df_test_140725.xlsx")
+sen1 <- df_all2 |>
+          dplyr::reframe(ob_id = ob_id,
+                        ob_country = ob_country,
+                        first_sia_check = dplyr::if_else(sia_first==first_reg_sia, "Y", "N"),
+                        last_sia_check = dplyr::if_else(sia_last==last_reg_sia, "Y", "N"))
+
+check_2 <- sia_rds_all |> dplyr::filter(sia_cat == "2_siard" & ob_R0_test == "Y")
+
+# Next steps:
+ ## Build out figure for showing SIAs by type - emeg color codded - need to build out color file
+ ## Bring down the the first breakthrough virus (in OB zone or out - different question) report date
+ # Identify next SIA to be completed (match to area?) -> 28 days after second SIA
+ # Loop or filter through to make table use SIA out as a guide
+ # pull it total duplicates and then filter rounds in dataset
+
+# Propose to Steph - D0 includes R0 that is also within 21 and super small
+
+
+
+
+
+
+
+
+
+
+# writexl::write_xlsx(df_all, path = "obx_df_test_140725.xlsx")
 
 # # Data Checking - All first report viruses are before
 # test <- df_all |>
