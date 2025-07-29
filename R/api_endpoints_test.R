@@ -1,124 +1,55 @@
 #' Check POLIS API Endpoints
-#' @description Tests WHO POLIS API endpoints for connectivity and response validation
-#' @param .table `str` Use "help" to see available table names, specify table names of interest to test (case-insensitive), or "all"/empty to test all tables
-#' @param api_key `str` validated API key
-#' @returns tibble
-#' @import From tibble tibble
+#' @description Tests WHO POLIS API endpoints for connectivity and estimate download time
+#' @param .table `str` Table to check endpoint or run NULL to check for each Table
+#' @returns tibble with status and associated information for each tested endpoint
+#' @importFrom tibble tibble
 #' @export
+check_polis_api_endpoints <- function(.table = NULL) {
+  api_key <- Sys.getenv("POLIS_API_KEY")
+  cache_file <- Sys.getenv("POLIS_CACHE_FILE")
 
-check_polis_api_endpoints <- function(...,
-                                      .table = NULL,
-                                      api_key = Sys.getenv("POLIS_API_KEY"),
-                                      cache_file = Sys.getenv("POLIS_CACHE_FILE")) {
+  # Filter Cache and Extract Tables
+  cache_data <- read_rds(cache_file) |>
+    dplyr::filter(!is.na(.data$polis_id), !is.na(.data$endpoint), !is.na(.data$table)) |>
+    dplyr::mutate(max_download_size = ifelse(.data$table %in% c("human_specimen", "environmental_sample", "activity", "sub_activity", "lqas"), 1000L, 2000L))
 
-  # Get table info
-  cache_processed <- readRDS(cache_file) |>
-    dplyr::filter(!is.na(table))
-
-  table_metadata <- cache_processed |>
-    split(cache_processed$table)
-
-  tables_list <- cache_processed |>
-    dplyr::filter(!is.na(.data$polis_id) & !is.na(.data$endpoint)) |>
-    dplyr::pull(table)
-
-  rm(cache_processed)
-
-  # User input to select table
-  input_tables <- if (length(list(...)) > 0) {
-    list(...) |> unlist() |> tolower()
-  } else {
-    (.table %||% "all") |> tolower()
+  # User Input Validation
+  if ((!is.null(.table) && length(.table) > 1) || (!is.null(.table) && !.table %in% cache_data$table)) {
+    cli::cli_alert_danger("Provide a valid table name or run () for all tables.")
+    return(invisible())
   }
 
-  # User input processing options
-  selected_tables <- if (is.null(input_tables) || length(input_tables) == 0 ||
-                         (length(input_tables) == 1 && input_tables == "all")) {
-    tables_list
+  selected_tables <- if (is.null(.table)) cache_data$table else .table
+  table_info <- cache_data |> dplyr::filter(.data$table %in% selected_tables)
 
-  } else if (length(input_tables) == 1 && input_tables == "help") {
-    available_msg <- paste(tables_list, collapse = ", ")
-    message("Available tables: ", available_msg)
-    return(invisible(tables_list))
+  # Process table
+  1:nrow(table_info) |>
+    lapply(function(i) {
+      row_data <- table_info[i, ]
+      start_time <- Sys.time()
+      api_url <- paste0("https://extranet.who.int/polis/api/v2/", row_data$endpoint, "?$inlinecount=allpages&$top=100")
+      response <- httr::RETRY("GET", api_url, httr::add_headers("authorization-token" = api_key), times = 10, pause_min = 2, quiet = TRUE, terminate_on_success = TRUE)
+      time_taken <- Sys.time() |> difftime(start_time, units = "secs") |> as.numeric()
+      status_info <- httr::http_status(response)
+      json_payload <- tryCatch(response$content |> rawToChar() |> jsonlite::fromJSON(), error = function(e) NULL)
 
-  } else {
-    found_tables <- input_tables[input_tables %in% tables_list]
-    missing_tables <- input_tables[!input_tables %in% tables_list]
-
-    if (length(missing_tables) > 0) {
-      if (length(missing_tables) == 1) {
-        cli::cli_alert_info("Table '{missing_tables}' doesn't exist or has invalid API configuration (NA polis_id/endpoint). Use check_polis_api_endpoints(\"help\") to see all available tables")
-      } else {
-        missing_list <- paste(missing_tables, collapse = ", ")
-        cli::cli_alert_info("Tables '{missing_list}' do not exist or have invalid API configuration (NA polis_id/endpoint). Use check_polis_api_endpoints(\"help\") to see all available tables")
-      }
-    }
-
-    if (length(found_tables) > 0) {
-      found_tables
-    } else {
-      return(invisible(NULL))
-    }
-  }
-
-  results <- list()
-
-  # Process each selected table
-  for (.table in selected_tables) {
-    start_time <- Sys.time()
-    table_data <- table_metadata[[.table]]
-
-    # Build API URL
-    api_url <- "https://extranet.who.int/polis/api/v2/" |>
-      paste0(table_data$endpoint, "?$inlinecount=allpages&$top=100")
-
-    # Make HTTP request
-    response <- httr::RETRY(
-      verb = "GET",
-      url = api_url,
-      config = httr::add_headers("authorization-token" = api_key),
-      times = 10,
-      pause_min = 2,
-      quiet = TRUE,
-      terminate_on_success = TRUE
-    )
-
-    # Process timing
-    check_datetime <- Sys.time()
-    time_taken <- check_datetime |>
-      difftime(start_time, units = "secs") |>
-      as.numeric()
-
-    # Extract HTTP request response
-    status_info <- httr::http_status(response)
-    success_flag <- status_info$category == "Success"
-    status_note <- status_info$message
-
-    # Parse and validate payload
-    if (success_flag) {
-      json_payload <- tryCatch({
-        response$content |> rawToChar() |> jsonlite::fromJSON()
-      }, error = function(e) {
-        success_flag <<- FALSE
-        NULL
-      })
-
+      # API endpoint summary
+      cli::cli_rule(paste("Table:", row_data$table))
+      cli::cli_text("API URL: {api_url}")
+      cli::cli_text("{status_info$message}")
+      cli::cli_text("Response Time: {round(time_taken, 2)} sec")
+      cli::cli_text("Total Records: {if (!is.null(json_payload$`odata.count`)) format(as.integer(json_payload$`odata.count`), big.mark = ',') else 'NA'}")
+      cli::cli_text("Max Download Size: {format(row_data$max_download_size, big.mark = ',')} per call")
+      cli::cli_text("Calls Needed: {if (!is.null(json_payload$`odata.count`)) ceiling(as.integer(json_payload$`odata.count`) / row_data$max_download_size) else 'NA'}")
+      cli::cli_text("Estimated Total Download Time: {if (!is.null(json_payload$`odata.count`)) paste(round(time_taken * ceiling(as.integer(json_payload$`odata.count`) / row_data$max_download_size), 2), 'sec') else 'NA'}")
+      cli::cli_text("Date and Time Checked: {format(Sys.time(), '%Y-%m-%d %H:%M:%S')}")
       if (!is.null(json_payload)) {
-        print(response)
+        cli::cli_text("Payload Type: {if (!is.null(json_payload$`odata.count`)) 'OData format' else 'JSON format'}")
+        cli::cli_text("Columns: {if (!is.null(json_payload$value) && is.data.frame(json_payload$value)) ncol(json_payload$value) else 0}")
       }
-    }
+      cli::cli_text("")
 
-    # Store result
-    results[[.table]] <- tibble(
-      table_name = .table, success_flag = success_flag, status_code = response$status_code,
-      status_note = status_note, time_taken_sec = round(time_taken, 2), checked_at = check_datetime
-    )
-  }
-
-  # Return results
-  if (length(results) > 0) {
-    results |> dplyr::bind_rows()
-  } else {
-    tibble()
-  }
+      # Return tibble
+      tibble(table_name = row_data$table, status_code = response$status_code, category = status_info$category, time_taken_sec = round(time_taken, 2), api_url = api_url, checked_at = Sys.time())
+    }) |> dplyr::bind_rows()
 }
