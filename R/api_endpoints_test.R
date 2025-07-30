@@ -1,27 +1,22 @@
 #' Check POLIS API Endpoints
 #' @description Tests WHO POLIS API endpoints for connectivity and estimate download time
 #' @param .table `str` Table to check endpoint or run NULL to check for each Table
+#' @details Valid table names: virus, case, human_specimen, environmental_sample, activity, sub_activity, lqas, im, population, geography, pop
 #' @returns tibble with status and associated information for each tested endpoint
-#' @importFrom tibble tibble
 #' @export
 check_polis_api_endpoints <- function(.table = NULL) {
   api_key <- Sys.getenv("POLIS_API_KEY")
-  cache_file <- Sys.getenv("POLIS_CACHE_FILE")
-
   # Filter Cache and Extract Tables
-  cache_data <- read_rds(cache_file) |>
-    dplyr::filter(!is.na(.data$polis_id), !is.na(.data$endpoint), !is.na(.data$table)) |>
-    dplyr::mutate(max_download_size = ifelse(.data$table %in% c("human_specimen", "environmental_sample", "activity", "sub_activity", "lqas"), 1000L, 2000L))
-
+  cache_data <- tidypolis:::tidypolis_io(io = "read", file_path = Sys.getenv("POLIS_CACHE_FILE")) |>
+    dplyr::filter(!is.na(polis_id), !is.na(endpoint), !is.na(table)) |>
+    dplyr::mutate(max_download_size = ifelse(table %in% c("human_specimen", "environmental_sample", "activity", "sub_activity", "lqas"), 1000L, 2000L))
   # User Input Validation
   if ((!is.null(.table) && length(.table) > 1) || (!is.null(.table) && !.table %in% cache_data$table)) {
     cli::cli_alert_danger("Provide a valid table name or run () for all tables.")
     return(invisible())
   }
-
   selected_tables <- if (is.null(.table)) cache_data$table else .table
-  table_info <- cache_data |> dplyr::filter(.data$table %in% selected_tables)
-
+  table_info <- cache_data |> dplyr::filter(table %in% selected_tables)
   # Process table
   1:nrow(table_info) |>
     lapply(function(i) {
@@ -32,12 +27,10 @@ check_polis_api_endpoints <- function(.table = NULL) {
       time_taken <- Sys.time() |> difftime(start_time, units = "secs") |> as.numeric()
       status_info <- httr::http_status(response)
       json_payload <- tryCatch(response$content |> rawToChar() |> jsonlite::fromJSON(), error = function(e) NULL)
-
       # API endpoint summary
       cli::cli_rule(paste("Table:", row_data$table))
       cli::cli_text("API URL: {api_url}")
       cli::cli_text("{status_info$message}")
-      cli::cli_text("Response Time: {round(time_taken, 2)} sec")
       cli::cli_text("Total Records: {if (!is.null(json_payload$`odata.count`)) format(as.integer(json_payload$`odata.count`), big.mark = ',') else 'NA'}")
       cli::cli_text("Max Download Size: {format(row_data$max_download_size, big.mark = ',')} per call")
       cli::cli_text("Calls Needed: {if (!is.null(json_payload$`odata.count`)) ceiling(as.integer(json_payload$`odata.count`) / row_data$max_download_size) else 'NA'}")
@@ -48,8 +41,7 @@ check_polis_api_endpoints <- function(.table = NULL) {
         cli::cli_text("Columns: {if (!is.null(json_payload$value) && is.data.frame(json_payload$value)) ncol(json_payload$value) else 0}")
       }
       cli::cli_text("")
-
       # Return tibble
-      tibble(table_name = row_data$table, status_code = response$status_code, category = status_info$category, time_taken_sec = round(time_taken, 2), api_url = api_url, checked_at = Sys.time())
+      dplyr::tibble(table_name = row_data$table, status_code = response$status_code, category = status_info$category, time_taken_sec = round(time_taken, 2), api_url = api_url, checked_at = Sys.time())
     }) |> dplyr::bind_rows()
 }
