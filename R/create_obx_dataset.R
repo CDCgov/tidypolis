@@ -187,7 +187,7 @@ df_all <- dplyr::left_join(df_all, last_ob, by = "ob_id") |>
          sia_date_upper = dplyr::if_else(is.na(sia_date_upper)==T, dplyr::lead(fv_onset), sia_date_upper))
 
 
-#Remove secondary data frames - clean enviroment
+#Remove secondary data frames - clean environment
 rm(df_first, df_ob, df_sec, last_ob,t1a)
 
 
@@ -445,6 +445,7 @@ sia_sub2 <- sia_sub2 |>
     sia_type = dplyr::first(activity.type),
     tot_kids = sum(u15pop, na.rm = T),
     sia_date = dplyr::first(activity.start.date),
+    sia_date_end = dplyr::first(activity.end.date),
     sia_length = median(sia_length, na.rm =T),
     sia_vac = dplyr::first(vaccine.type)) |>
   dplyr::select(-activity.start.date, -adm2guid)
@@ -472,7 +473,6 @@ sia_rds <- sia_sub2 |>
     mopup_check = dplyr::case_when(
       sia_type == "Mop-Up" ~ "Y",
       dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl  & sia_time_diff <= 21 ~ "Y",
-      dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl & sia_time_diff <= 21 ~ "Y",
       TRUE ~ "N"),
     sia_cat = dplyr::case_when(
       ob_R0 == "Y" ~ "1_R0",
@@ -500,7 +500,8 @@ sia_out2 <-  sia_rds |>
            id = x,
            snids_rds = dplyr::n(),
            first_reg_sia = dplyr::first(sia_date),
-           sec_reg_sia = dplyr::nth(sia_date, 2))
+           sec_reg_sia = dplyr::nth(sia_date, 2),
+           sec_reg_sia_end = dplyr::nth(sia_date_end, 2))
            # thrd_reg_sia = dplyr::nth(sia_date, 3),
            # last_reg_sia = dplyr::last(sia_date))
 
@@ -531,8 +532,8 @@ ob_table_final <- df_all2 |>
                       snids_rds < 1 ~ "3_<1Rds"),
             # # Breakthrough Virus in Country - 28 days after second SIA completed from initial response
                     int_brk_vr = dplyr::case_when(
-                             ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds >= 2 & most_recent > (sec_reg_sia + lubridate::days(28)) ~ "1_y",
-                             ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds >= 2 & most_recent <= (sec_reg_sia + lubridate::days(28)) ~ "2_n",
+                             ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds >= 2 & most_recent > (sec_reg_sia_end + lubridate::days(28)) ~ "1_y",
+                             ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds >= 2 & most_recent <= (sec_reg_sia_end + lubridate::days(28)) ~ "2_n",
                              ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds <2 | ipv_ctry == "yes" ~ "3_<2Rds",
                              ob_new == "1_y" &  is.na(ipv_ctry) == T ~ "4_newob",
                              ipv_ctry == "IPV Only" ~ "5_ipvctry"),
@@ -544,9 +545,39 @@ rm(df_all2)
 
 
 
+# Part II Build out SIA data Frame
+# Key Idea -> Use windows to identify SIAs build out subcomponets aligning with response to first SIA,
+# if there is any virus detected at the country after
+# Using Breakthrough window as 28 days from ending date of second SIA and following breakthrough
+
+x <- "ANG-cVDPV2-2"
+x <- df_all$ob_id[i]
+df_sub <- ob_table_final |> dplyr::filter(ob_id == x)
+
+ob_start <- df_sub$ob_srt_d0
+ob_end <- df_sub$most_recent
+sia_end <- df_sub$sia_date_upper
+ctry <- df_sub$ob_country
+sero <- df_sub$ob_type
+sia2 <- df_sub$sec_reg_sia
+b_virus <- df_sub$int_brk_vr
+
+
+# Can rename the
+base <- df_sub |>
+          dplyr::select(ob_id, ob_type, ob_country, most_recent, first_reg_sia, sec_reg_sia, sec_reg_sia_end, int_brk_vr) |>
+          dplyr::mutate(ob_id_sia = paste0(ob_id, "-", "0"))
+
+# identify  the first breakthrough virus was after the breakthrough
 
 
 
+# # Get outbreak length to get median year of outbreak - rounded up for population estimates
+# yr_start <- df_sub$fv_yr
+# yr_end <- lubridate::year(df_sub$most_recent)
+# yrs <- c(yr_start, yr_end)
+# yr_pop<- round(median(yrs))
+# # Population - get midpoint of year of outbreak
 
 
 
