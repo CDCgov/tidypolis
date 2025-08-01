@@ -1,12 +1,4 @@
-
-# Load data
-raw.data <- sirfunctions::get_all_polio_data(size="medium")
-# Nearest neighbor data
-nn_first <- sirfunctions::edav_io(io = "read", default_dir = "GID/GIDMEA/giddatt", file_loc = "data_raw/nn_fv_obs.rds")
-# IPV Coverage
-
-# #Test Code
-# obx_table <- gen_obx_table(raw.data,nn_first)
+# To-do: add in Outbreak Length from start
 
 gen_obx_table <- function(raw.data, nn_first){
   #Load Internal Inputs
@@ -487,6 +479,7 @@ sia_out <- sia_rds |>
 
 
 
+
 # # Focus on SNID / NIDS and CRS that do not appear as
 # Pull out any that do not cover
 # Some R0 can be big agains the
@@ -536,6 +529,7 @@ ob_table_final <- df_all2 |>
             # Surveillance Delay - if Epid from virus that was first reported based on report_date differs first virus based on onset
              delayed_surv = dplyr::if_else(
                             fv_epid == ob_srt_epid, "2_n", "1_y"))
+
 
 return(ob_table_final)
 }
