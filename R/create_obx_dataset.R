@@ -489,6 +489,7 @@ sia_out2 <-  sia_rds |>
            id = x,
            snids_rds = dplyr::n(),
            first_reg_sia = dplyr::first(sia_date),
+           first_reg_sia_end = dplyr::first(sia_date_end),
            sec_reg_sia = dplyr::nth(sia_date, 2),
            sec_reg_sia_end = dplyr::nth(sia_date_end, 2))
            # thrd_reg_sia = dplyr::nth(sia_date, 3),
