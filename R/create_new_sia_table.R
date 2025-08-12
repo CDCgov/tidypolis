@@ -5,8 +5,11 @@
 source(here::here("R/create_obx_dataset.R"))
 source(here::here("R/gen_obx_br_rds.R"))
 
-# Load data
 raw.data <- sirfunctions::get_all_polio_data(size="medium")
+
+
+raw.data$pos <- raw.data$pos |>
+                  dplyr::filter(!epid == "ISR-1-11-24-26")
 # Nearest neighbor data
 nn_first <- sirfunctions::edav_io(io = "read", default_dir = "GID/GIDMEA/giddatt", file_loc = "data_raw/nn_fv_obs.rds")
 
@@ -52,7 +55,7 @@ positives.clean.01 <- raw.data[["pos"]] |>
 obx_sia_rds <- list()
 
 for (i in 1:nrow(obx_table)){
-# x <- "ALG-cVDPV2-1"
+# x <- "ANG-cVDPV2-1"
 x <- obx_table$ob_id[i]
 df_sub <- obx_table |> dplyr::filter(ob_id == x)
 
@@ -85,7 +88,8 @@ sia_data  <- raw.data$sia |>
                   status == "Done") |>
   dplyr::mutate(activity.end.date = dplyr::if_else(is.na(activity.end.date)==T,
                                                    activity.start.date,
-                                                   activity.end.date))
+                                                   activity.end.date),
+                activity.end.date = dplyr::if_else(sia.code == "ETH-2021-002", lubridate::as_date("2021-11-15"),activity.end.date))
 
 if(sero == "cVDPV 2"){
 
@@ -118,7 +122,6 @@ if(sero == "cVDPV 2"){
 
 sia_sub2 <- sia_sub |>
   # Filter out rounds labeled mop-up
-  dplyr::filter(!activity.type == "Mop-Up") |>
   dplyr::mutate(activity.start.date = lubridate::as_date(activity.start.date),
                 activity.end.date = lubridate::as_date(activity.end.date)) |>
   dplyr::arrange(activity.start.date, sia.code) |>
@@ -144,7 +147,8 @@ sia_sub2 <- sia_sub |>
   dplyr::mutate(
     sia_no = dplyr::row_number(),
     # Identify any R0s occuring within 14 days of the OB declaration
-    ob_R0 = dplyr::if_else(sia_date <= (ob_start + lubridate::days(14)), "Y", "N"),
+    ob_R0 = dplyr::if_else( sia_date > ob_start &
+                     sia_date <= (ob_start + lubridate::days(14)), "Y", "N"),
     # Time between SIAS
     sia_time_diff = sia_date - dplyr::lag(sia_date, default= ob_start),
     # Time between SIAS
@@ -153,8 +157,8 @@ sia_sub2 <- sia_sub |>
       dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl  & sia_time_diff <= 21 ~ "Y",
       TRUE ~ "N"),
     sia_cat = dplyr::case_when(
+      mopup_check == "Y" | sia_type == "Mop-Up" ~ "3_mop-up",
       ob_R0 == "Y" ~ "1_R0",
-      mopup_check == "Y" ~ "3_mop-up",
       TRUE ~ "2_siard")) |>
   dplyr::arrange(sia_date, sia_cat) |>
   dplyr::filter(sia_cat == "2_siard")
@@ -169,10 +173,13 @@ cli::cli_alert(paste0(x, " outbreak completed"))
 
 sia_obx_table <- do.call(rbind, obx_sia_rds)
 
+# Table aligns outbreaks current for second SIA Start / End date in first line
+# TIme to breakthrough in second (first sia)
 sia_obx_table <- sia_obx_table |>
                    dplyr::rename(
-                    "sia_start_date" = first_reg_sia) |>
-                   dplyr::select(-most_recent, -first_reg_sia_end) |>
+                    "time_to_int_str" = first_reg_sia,
+                    "time_to_int_end" = first_reg_sia_end) |>
+                   dplyr::select(-most_recent) |>
                    dplyr::relocate(ob_sia_id, .after = ob_id)
 
 # Need to investigate ETH-cVDPV2-1-5

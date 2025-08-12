@@ -1,5 +1,5 @@
 gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub2,df_sub){
-  # x <- "ANG-cVDPV2-1"
+  # X<- "ANG-cVDPV2-1"
   # df_sub <- obx_table |> dplyr::filter(ob_id == x)
 
   if (df_sub |> tail(1) |> dplyr::pull(int_brk_vr) == "1_y"){
@@ -18,9 +18,9 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub2,df_sub){
     siabr_end <-  base |> tail(1) |> dplyr::pull(sec_reg_sia_end)
     ctry       <-  base |> tail(1) |> dplyr::pull(ob_country)
 
-    base <- base |> dplyr::select(-sec_reg_sia,-sec_reg_sia_end, -sia_date_upper)
+    base <- base |> dplyr::select(-sia_date_upper)
 
-
+    # Check with Steph here if it should be the end plus 28 or start plus 28 + 3
     next_virus <- positives.clean.01 |>
       dplyr::filter(
         place.admin.0 == ctry &
@@ -154,20 +154,28 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub2,df_sub){
     br_sub <- base
     br_sub <- br_sub|>
       dplyr::mutate(subid = dplyr::row_number(),
-                    ob_sia_id = paste0(ob_id, "-", subid)) |>
-      dplyr::select(-subid)
+                    ob_sia_id = paste0(ob_id, "-", subid),
+                    br_viz = dplyr::case_when(
+                      dplyr::row_number() == 1 ~ sec_reg_sia,
+                      TRUE ~ first_reg_sia)
+                    ) |>
+
+      dplyr::select(-subid, -sec_reg_sia, -sec_reg_sia_end)
 return(br_sub)
 
 }else{
     base <- df_sub |>
     dplyr::ungroup() |>
-    dplyr::select(ob_id, ob_country, ipv_ctry, ob_srt_epid, ob_srt_onset, ob_srt_d0, first_reg_sia,first_reg_sia_end, most_recent, int_brk_vr)
+    dplyr::select(ob_id, ob_country, ipv_ctry, ob_srt_epid, ob_srt_onset, ob_srt_d0, first_reg_sia,first_reg_sia_end, sec_reg_sia, sec_reg_sia_end, most_recent, int_brk_vr)
 
     br_sub <- base
     br_sub <- br_sub|>
       dplyr::mutate(subid = dplyr::row_number(),
-                    ob_sia_id = paste0(ob_id, "-", subid)) |>
-      dplyr::select(-subid)
+                    ob_sia_id = paste0(ob_id, "-", subid),
+                    br_viz = dplyr::case_when(
+                      dplyr::row_number() == 1 ~ sec_reg_sia,
+                      TRUE ~ first_reg_sia)) |>
+      dplyr::select(-subid, -sec_reg_sia, -sec_reg_sia_end)
 return(br_sub)
 
   }

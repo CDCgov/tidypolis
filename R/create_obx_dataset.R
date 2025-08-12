@@ -321,7 +321,9 @@ df_all <- df_all |>
 ### Add in SIA data now - for table only trying to identify response to SIAs, clean-up SIA data and number of rounds to determine if we had a breakthrough virus
 sia_data  <- raw.data$sia |>
   dplyr::filter(yr.sia >= lubridate::year(start.date) &
-                  status == "Done")
+                  status == "Done") |>
+  dplyr::mutate(activity.end.date =dplyr::if_else(sia.code == "ETH-2021-002", lubridate::as_date("2021-11-15"),activity.end.date))
+
 ob_sias <- list()
 sia_rds1 <- list()
 
