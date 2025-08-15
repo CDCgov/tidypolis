@@ -56,6 +56,7 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub2,df_sub){
       dplyr::filter(sia_date >= sia_next &
                     sia_date < ob_sia_end) |>
       dplyr::summarise(
+        sia_name = dplyr::first(sia_code),
         first_reg_sia = dplyr::first(sia_date),
         first_reg_sia_end = dplyr::first(sia_date_end))
 
@@ -128,6 +129,7 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub2,df_sub){
       next_sia <- sia_sub2 |>
         dplyr::filter(sia_date >= sia_next) |>
         dplyr::summarise(
+          sia_name = dplyr::first(sia_code),
           first_reg_sia = dplyr::first(sia_date),
           first_reg_sia_end = dplyr::first(sia_date_end))
 

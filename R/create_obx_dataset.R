@@ -17,7 +17,7 @@ active.end.date <- lubridate::floor_date(raw.data$metadata$download_time, "week"
 outbreak_window <- 365
 # Using old SOP definition
 breakthrough <- 28
-# Threshold for percent of disticts included to identify small rounds for mop-ups, 20% of CRs are under 6% of districts
+# Threshold for percent of districtss included to identify small rounds for mop-ups, 20% of CRs are under 6% of districts
 cov_pct_lvl <- 6
 
 
@@ -276,7 +276,7 @@ df_all <- dplyr::left_join(df_all, op_epi2, by = "ob_id") |>
     tot_no_detects >= 2 ~ "obx",
     TRUE ~ "obx_check"),
     ob_bin = dplyr::if_else(ob_cat == "obx", "obx", "evt")) |>
-  dplyr::select(- ob_count, -ob_overall)
+  dplyr::select(-ob_count, -ob_overall)
 
 rm(ob_epi, op_epi2)
 
@@ -469,6 +469,7 @@ sia_rds <- sia_sub2 |>
       mopup_check == "Y" ~ "3_mop-up",
       TRUE ~ "2_siard")) |>
   dplyr::arrange(sia_date, sia_cat)
+
 
 
 # # Pull out total number of SIA coded rounds:

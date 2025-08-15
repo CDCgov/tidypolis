@@ -53,6 +53,7 @@ positives.clean.01 <- raw.data[["pos"]] |>
 
 # Gen list to catch all round sub tables to merge after
 obx_sia_rds <- list()
+obx_sia_full_list <- list()
 
 for (i in 1:nrow(obx_table)){
 # x <- "ANG-cVDPV2-1"
@@ -120,7 +121,7 @@ if(sero == "cVDPV 2"){
 
 }
 
-sia_sub2 <- sia_sub |>
+sia_sub_all <- sia_sub |>
   # Filter out rounds labeled mop-up
   dplyr::mutate(activity.start.date = lubridate::as_date(activity.start.date),
                 activity.end.date = lubridate::as_date(activity.end.date)) |>
@@ -130,6 +131,7 @@ sia_sub2 <- sia_sub |>
     adm2guid = dplyr::first(adm2guid),
     sia_code = dplyr::first(sia.code), # keep only first sia.code to match
     code_count = dplyr::n_distinct(sia.code),
+    sia_country = dplyr::first(place.admin.0),
     sia_dist = dplyr::n_distinct(place.admin.2),
     sia_prov = dplyr::n_distinct(place.admin.1),
     sia_type = dplyr::first(activity.type),
@@ -160,18 +162,37 @@ sia_sub2 <- sia_sub |>
       mopup_check == "Y" | sia_type == "Mop-Up" ~ "3_mop-up",
       ob_R0 == "Y" ~ "1_R0",
       TRUE ~ "2_siard")) |>
-  dplyr::arrange(sia_date, sia_cat) |>
+  dplyr::arrange(sia_date, sia_cat)
+
+
+# Identify first and second SIA responses
+
+
+sia_sub2 <-  sia_sub_all |>
   dplyr::filter(sia_cat == "2_siard")
+
+sia_int <- sia_sub2 |>
+  dplyr::mutate(
+    sia_rd_viz = dplyr::case_when(
+      dplyr::row_number() == 1 ~ "first_sia",
+      dplyr::row_number() == 2 ~ "second_sia",
+      TRUE ~ NA_character_)) |>
+  dplyr::select(sia_code, sia_rd_viz)
+
+sia_sub_all <- dplyr::left_join(sia_sub_all, sia_int, by = "sia_code")
+
 
 
 br_sub <- gen_obx_sia_br_rds(positives.clean.01,sia_sub2,df_sub)
 
-
+obx_sia_full_list[[i]] <- sia_sub_all
 obx_sia_rds[[i]] <- br_sub
 cli::cli_alert(paste0(x, " outbreak completed"))
 }
 
-sia_obx_table <- do.call(rbind, obx_sia_rds)
+sia_full_all <- do.call(plyr::rbind.fill, obx_sia_full_list)
+
+sia_obx_table <- do.call(plyr::rbind.fill, obx_sia_rds)
 
 # Table aligns outbreaks current for second SIA Start / End date in first line
 # TIme to breakthrough in second (first sia)
@@ -182,7 +203,25 @@ sia_obx_table <- sia_obx_table |>
                    dplyr::select(-most_recent) |>
                    dplyr::relocate(ob_sia_id, .after = ob_id)
 
+
+# Create a sensitivity analysis for identifying response and breakthrough rds
+br_rd_codes <- sia_obx_table |>
+                  dplyr::filter(is.na(sia_name)==F) |>
+                  dplyr::pull(sia_name)
+
+
+sia_full_all <- sia_full_all |>
+                  dplyr::mutate(
+                    sia_rd_viz =
+                    dplyr::case_when(
+                      is.na(sia_rd_viz) == F ~ sia_rd_viz,
+                      is.na(sia_rd_viz) == T & sia_cat == "1_R0" ~ "round_0",
+                      is.na(sia_rd_viz) == T & sia_cat == "3_mop-up" ~ "mopup_sia",
+                      sia_code %in% br_rd_codes ~ "brk_sia",
+                      TRUE ~ "extra_sias"))
+
+
 # Need to investigate ETH-cVDPV2-1-5
 
-rm(br_sub, df_sub, dist, obx_sia_rds, positives.clean.01, prov, sia_data, sia_sub, sia_sub2)
+rm(br_sub, df_sub, dist, obx_sia_rds, positives.clean.01, prov, sia_data, sia_sub, sia_sub2 , x)
 

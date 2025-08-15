@@ -5,16 +5,17 @@ source(here::here("R/create_sia_graph.R"))
 
 
 
-run_obx_sia_graph<- function(obx_table, raw.data, sia_obx_table, run_type, save_graph, cdc_upload){
+run_obx_sia_graph<- function(obx_table, raw.data, sia_obx_table, run_type, sia_full_all, save_graph, cdc_upload, viz){
 
 
 if(run_type == "all"){
 
   for (i in 1:nrow(obx_table)){
+       # x <- "BEN-cVDPV2-1"
     x <- obx_table$ob_id[i]
     df_sub <- obx_table |> dplyr::filter(ob_id == x)
 
-    g1 <- gen_obx_map_reg_sia(df_sub, raw.data, sia_obx_table, x)
+    g1 <- gen_obx_map_reg_sia(df_sub, raw.data, sia_obx_table, sia_full_all, viz, x)
 
 
  if (save_graph == "yes"){
@@ -60,7 +61,7 @@ if(run_type == "all"){
     x <- obx_active$ob_id[i]
     df_sub <- obx_active |> dplyr::filter(ob_id == x)
 
-    g1 <- gen_obx_map_reg_sia(df_sub, raw.data, sia_obx_table, x)
+    g1 <- gen_obx_map_reg_sia(df_sub, raw.data, sia_obx_table, sia_full_all, viz, x)
 
 
     if (save_graph == "yes"){

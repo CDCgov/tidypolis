@@ -6,7 +6,7 @@
 
 
 
-gen_obx_map_reg_sia<- function(df_sub, raw.data, sia_obx_table, x){
+gen_obx_map_reg_sia<- function(df_sub, raw.data, sia_obx_table, sia_full_all, viz, x){
 
 ob_start <- df_sub$fv_onset - lubridate::month(1)
 sia1_start <- df_sub |> dplyr::pull(first_reg_sia)
@@ -95,83 +95,182 @@ sia_data_sub <- raw.data$sia |>
          activity.end.date = lubridate::ymd(activity.end.date),
          sia_proxy = "SIA",
          status = factor(status)) |>
-  dplyr::arrange(place.admin.0, place.admin.1, activity.start.date) |>
+  dplyr::arrange(activity.start.date, sia.code, place.admin.0, place.admin.1) |>
   dplyr::distinct(sia.code, place.admin.1, .keep_all = TRUE)
 
 
-g1 <- ggplot2::ggplot() +
-      ggplot2::geom_point(data=v_map, ggplot2::aes(x=place.admin.1, y = dateonset, shape = measurement, color = emergencegroup),  size = 3) +
-      ggplot2::geom_point(data=day0_data, ggplot2::aes(x=place.admin.1, y = dateonset, shape = measurement), size = 6, stroke = 1) +
-      ggplot2::scale_color_manual(name = "Emergence Groups:",
-                                  values = emg_cols) +
-      ggplot2::coord_flip() +
-      ggplot2::xlab("Impacted Region") +
-      ggplot2::ylab("Date of Onset / Collection") +
-      ggplot2::theme_bw() +
-      ggplot2::scale_y_date(date_breaks = "4 months",
-                            date_labels = "%b '%y",
-                            limits = c(lubridate::as_date(ob_min), lubridate::as_date(ob_max))) +
-  ggplot2::geom_errorbar(data=sia_data_sub,
-                ggplot2::aes(x=place.admin.1,
-                    y = activity.start.date,
-                    ymin=activity.start.date,
-                    ymax = activity.start.date,
-                    linetype = status),
-                    width = 0.75,
-                    show.legend = F) +
-  ggplot2::scale_shape_manual(name = "Detection Type:",
-                         values = c(
-                           "VDPV 1" =  8,
-                           "VDPV 2" =  8,
-                           "VDPV 3" =  8,
-                           "cVDPV 2" = 16,
-                           "cVDPV 1" = 16,
-                           "cVDPV 3" = 16,
-                           "WILD 1" = 15,
-                           "Day 0 Virus" = 1),
-                         labels = c( "VDPV 1" =  "VDPV1",
-                                     "VDPV 2" =  "VDPV2",
-                                     "VDPV 3" =  "VDPV3",
-                                     "cVDPV 2" = "cVDPV2",
-                                     "cVDPV 1" = "cVDPV1",
-                                     "cVDPV 3" = "cVDPV3",
-                                     "WILD 1" = "WPV1",
-                                     "Day 0 Virus" = "Day 0 Virus"),
-                         breaks = c("Day 0 Virus", "cVDPV 1", "cVDPV 2", "cVDPV 3",
-                                    "VDPV 1", "VDPV 2", "VDPV 3", "WILD 1"), drop = F) +
-  ggplot2::geom_rect(data = sia_phases,
-  ggplot2::aes(xmin = -Inf,
-                xmax = Inf,
-                ymin = lubridate::as_date(ob_srt_d0), ymax = lubridate::as_date(br_viz) + lubridate::days(3)), fill = "grey40", alpha = .2) +
-  ggplot2::geom_rect(data = sia_phases,
-                     ggplot2::aes(xmin = -Inf,
-                                  xmax = Inf,
-                                  ymin = (lubridate::as_date(br_viz) + lubridate::days(3)), ymax = (lubridate::as_date(br_viz) + lubridate::days(28))), fill = "blue", alpha = .2) +
+if(nrow(sia_data_sub) == 0){
+sia_data_sub <- sia_data_sub |>
+    dplyr::mutate(
+      sia_rd_viz = NA)
+}else{
+sia_codes <- sia_full_all |>
+                dplyr::select(sia_date, sia_country, sia_rd_viz)
 
-  ggplot2::theme(
-    axis.title = ggplot2::element_text(size = 12, face = "bold"),
-    axis.text =  ggplot2::element_text(size = 10),
-    legend.position = "bottom",
-    legend.key = ggplot2::element_blank(),
-    legend.title.position = "top",
-    legend.direction = "horizontal",
-    # legend.spacing.x = unit(0.05, 'cm'),
-    legend.text = ggplot2::element_text(size = 10),
-    plot.title.position = "plot",
-    plot.title = ggplot2::element_text(size = 12,
-                              face = "bold"),
-    plot.subtitle = ggplot2::element_text(size = 10)) +
-  ggplot2::guides(
-    color = ggplot2::guide_legend(order = 2, nrow = 3),
-    shape = ggplot2::guide_legend(order = 1, override.aes = list(size=3), ncol=1)) +
-  ggplot2::labs(
-    title = paste0(df_sub$ob_country, ": ", df_sub$ob_type, " Outbreak (", df_sub$ob_id, ")"),
-    subtitle = paste0("Status: ", df_sub$ob_status_bin),
-    caption = paste0("Solid lines repersent completed SIA Rounds. Grey Shading indicates time from Day 0 to 2nd or Breakthrough SIA.\n",
-                     "Blue shading indicate 28 day washout period following 2nd or breakthrough SIA round.\n",
-                     "Produced by: CDC-CGH-GID-PEB. Source: POLIS (Data as of ",raw.data$metadata$download_time,")", sep= ""))
+sia_data_sub <- dplyr::left_join(sia_data_sub, sia_codes, by = c("activity.start.date" = "sia_date",
+                                                                   "place.admin.0" ="sia_country")) |>
+                dplyr::mutate(
+                  sia_rd_viz = factor(sia_rd_viz, levels = c(
+                    "round_0","first_sia", "second_sia",
+                    "mopup_sia", "brk_sia", "extra_sias")))
 
-
-return(g1)
 }
 
+
+
+if(viz == "sen_check"){
+  g1 <- ggplot2::ggplot() +
+    ggplot2::geom_point(data=v_map, ggplot2::aes(x=place.admin.1, y = dateonset, shape = measurement, color = emergencegroup),  size = 3) +
+    ggplot2::geom_point(data=day0_data, ggplot2::aes(x=place.admin.1, y = dateonset, shape = measurement), size = 6, stroke = 1) +
+    ggplot2::scale_color_manual(name = "Emergence Groups:",
+                                values = emg_cols) +
+    ggplot2::coord_flip() +
+    ggplot2::xlab("Impacted Region") +
+    ggplot2::ylab("Date of Onset / Collection") +
+    ggplot2::theme_bw() +
+    ggplot2::scale_y_date(date_breaks = "4 months",
+                          date_labels = "%b '%y",
+                          limits = c(lubridate::as_date(ob_min), lubridate::as_date(ob_max))) +
+    ggnewscale::new_scale_color() +
+    ggplot2::geom_errorbar(data=sia_data_sub,
+                           ggplot2::aes(x=place.admin.1,
+                                        y = activity.start.date,
+                                        ymin=activity.start.date,
+                                        ymax = activity.start.date,
+                                        color = sia_rd_viz),
+                           width = 0.75,
+                           linetype = "solid") +
+    ggplot2::scale_shape_manual(name = "Detection Type:",
+                                values = c(
+                                  "VDPV 1" =  8,
+                                  "VDPV 2" =  8,
+                                  "VDPV 3" =  8,
+                                  "cVDPV 2" = 16,
+                                  "cVDPV 1" = 16,
+                                  "cVDPV 3" = 16,
+                                  "WILD 1" = 15,
+                                  "Day 0 Virus" = 1),
+                                labels = c( "VDPV 1" =  "VDPV1",
+                                            "VDPV 2" =  "VDPV2",
+                                            "VDPV 3" =  "VDPV3",
+                                            "cVDPV 2" = "cVDPV2",
+                                            "cVDPV 1" = "cVDPV1",
+                                            "cVDPV 3" = "cVDPV3",
+                                            "WILD 1" = "WPV1",
+                                            "Day 0 Virus" = "Day 0 Virus"),
+                                breaks = c("Day 0 Virus", "cVDPV 1", "cVDPV 2", "cVDPV 3",
+                                           "VDPV 1", "VDPV 2", "VDPV 3", "WILD 1"), drop = F) +
+    ggplot2::scale_color_manual(name = "SIA Type:",
+                                values =  c("round_0" = "green",
+                                            "first_sia" ="lightblue",
+                                            "second_sia" = "dodgerblue",
+                                            "mopup_sia" = "orange",
+                                            "brk_sia"= "black",
+                                            "extra_sias" = "brown")) +
+    ggplot2::geom_rect(data = sia_phases,
+                       ggplot2::aes(xmin = -Inf,
+                                    xmax = Inf,
+                                    ymin = lubridate::as_date(ob_srt_d0), ymax = lubridate::as_date(br_viz) + lubridate::days(3)), fill = "grey40", alpha = .2) +
+    ggplot2::geom_rect(data = sia_phases,
+                       ggplot2::aes(xmin = -Inf,
+                                    xmax = Inf,
+                                    ymin = (lubridate::as_date(br_viz) + lubridate::days(3)), ymax = (lubridate::as_date(br_viz) + lubridate::days(28))), fill = "blue", alpha = .2) +
+
+    ggplot2::theme(
+      axis.title = ggplot2::element_text(size = 12, face = "bold"),
+      axis.text =  ggplot2::element_text(size = 10),
+      legend.position = "bottom",
+      legend.key = ggplot2::element_blank(),
+      legend.title.position = "top",
+      legend.direction = "horizontal",
+      # legend.spacing.x = unit(0.05, 'cm'),
+      legend.text = ggplot2::element_text(size = 10),
+      plot.title.position = "plot",
+      plot.title = ggplot2::element_text(size = 12,
+                                         face = "bold"),
+      plot.subtitle = ggplot2::element_text(size = 10)) +
+    ggplot2::guides(
+      color = ggplot2::guide_legend(order = 2, nrow = 3),
+      shape = ggplot2::guide_legend(order = 1, override.aes = list(size=3), ncol=1)) +
+    ggplot2::labs(
+      title = paste0(df_sub$ob_country, ": ", df_sub$ob_type, " Outbreak (", df_sub$ob_id, ")"),
+      subtitle = paste0("Status: ", df_sub$ob_status_bin),
+      caption = paste0("Solid lines repersent completed SIA Rounds. Grey Shading indicates time from Day 0 to 2nd or Breakthrough SIA.\n",
+                       "Blue shading indicate 28 day washout period following 2nd or breakthrough SIA round.\n",
+                       "Produced by: CDC-CGH-GID-PEB. Source: POLIS (Data as of ",raw.data$metadata$download_time,")", sep= ""))
+}else{
+  g1 <- ggplot2::ggplot() +
+    ggplot2::geom_point(data=v_map, ggplot2::aes(x=place.admin.1, y = dateonset, shape = measurement, color = emergencegroup),  size = 3) +
+    ggplot2::geom_point(data=day0_data, ggplot2::aes(x=place.admin.1, y = dateonset, shape = measurement), size = 6, stroke = 1) +
+    ggplot2::scale_color_manual(name = "Emergence Groups:",
+                                values = emg_cols) +
+    ggplot2::coord_flip() +
+    ggplot2::xlab("Impacted Region") +
+    ggplot2::ylab("Date of Onset / Collection") +
+    ggplot2::theme_bw() +
+    ggplot2::scale_y_date(date_breaks = "4 months",
+                          date_labels = "%b '%y",
+                          limits = c(lubridate::as_date(ob_min), lubridate::as_date(ob_max))) +
+    ggplot2::geom_errorbar(data=sia_data_sub,
+                           ggplot2::aes(x=place.admin.1,
+                                        y = activity.start.date,
+                                        ymin=activity.start.date,
+                                        ymax = activity.start.date,
+                                        linetype = status),
+                           width = 0.75,
+                           show.legend = F) +
+    ggplot2::scale_shape_manual(name = "Detection Type:",
+                                values = c(
+                                  "VDPV 1" =  8,
+                                  "VDPV 2" =  8,
+                                  "VDPV 3" =  8,
+                                  "cVDPV 2" = 16,
+                                  "cVDPV 1" = 16,
+                                  "cVDPV 3" = 16,
+                                  "WILD 1" = 15,
+                                  "Day 0 Virus" = 1),
+                                labels = c( "VDPV 1" =  "VDPV1",
+                                            "VDPV 2" =  "VDPV2",
+                                            "VDPV 3" =  "VDPV3",
+                                            "cVDPV 2" = "cVDPV2",
+                                            "cVDPV 1" = "cVDPV1",
+                                            "cVDPV 3" = "cVDPV3",
+                                            "WILD 1" = "WPV1",
+                                            "Day 0 Virus" = "Day 0 Virus"),
+                                breaks = c("Day 0 Virus", "cVDPV 1", "cVDPV 2", "cVDPV 3",
+                                           "VDPV 1", "VDPV 2", "VDPV 3", "WILD 1"), drop = F) +
+    ggplot2::geom_rect(data = sia_phases,
+                       ggplot2::aes(xmin = -Inf,
+                                    xmax = Inf,
+                                    ymin = lubridate::as_date(ob_srt_d0), ymax = lubridate::as_date(br_viz) + lubridate::days(3)), fill = "grey40", alpha = .2) +
+    ggplot2::geom_rect(data = sia_phases,
+                       ggplot2::aes(xmin = -Inf,
+                                    xmax = Inf,
+                                    ymin = (lubridate::as_date(br_viz) + lubridate::days(3)), ymax = (lubridate::as_date(br_viz) + lubridate::days(28))), fill = "blue", alpha = .2) +
+
+    ggplot2::theme(
+      axis.title = ggplot2::element_text(size = 12, face = "bold"),
+      axis.text =  ggplot2::element_text(size = 10),
+      legend.position = "bottom",
+      legend.key = ggplot2::element_blank(),
+      legend.title.position = "top",
+      legend.direction = "horizontal",
+      # legend.spacing.x = unit(0.05, 'cm'),
+      legend.text = ggplot2::element_text(size = 10),
+      plot.title.position = "plot",
+      plot.title = ggplot2::element_text(size = 12,
+                                         face = "bold"),
+      plot.subtitle = ggplot2::element_text(size = 10)) +
+    ggplot2::guides(
+      color = ggplot2::guide_legend(order = 2, nrow = 3),
+      shape = ggplot2::guide_legend(order = 1, override.aes = list(size=3), ncol=1)) +
+    ggplot2::labs(
+      title = paste0(df_sub$ob_country, ": ", df_sub$ob_type, " Outbreak (", df_sub$ob_id, ")"),
+      subtitle = paste0("Status: ", df_sub$ob_status_bin),
+      caption = paste0("Solid lines repersent completed SIA Rounds. Grey Shading indicates time from Day 0 to 2nd or Breakthrough SIA.\n",
+                       "Blue shading indicate 28 day washout period following 2nd or breakthrough SIA round.\n",
+                       "Produced by: CDC-CGH-GID-PEB. Source: POLIS (Data as of ",raw.data$metadata$download_time,")", sep= ""))
+
+}
+return(g1)
+}
