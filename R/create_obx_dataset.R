@@ -69,17 +69,37 @@ df_ob <- positives.clean.01 |>
 
 # All other outbreaks of the same country that includes a year gap in the time between virus detections
 # To strengthen can do a sensitivity check to see if the next virus included the NN data and was not realted to location ciruclation
+#
+# df_sec <- positives.clean.01 |>
+#   dplyr::arrange(place.admin.0, measurement, dateonset) |>
+#   dplyr::mutate(
+#     ob_flag = ifelse(place.admin.0 == dplyr::lag(place.admin.0, default = dplyr::first(place.admin.0)) &
+#                        measurement == dplyr::lag(measurement, default = dplyr::first(measurement)),
+#                      "TRUE", "FALSE"),
+#     ob_flag_emg = ifelse(emergencegroup == dplyr::lag(emergencegroup, default = dplyr::first(emergencegroup)), "TRUE", "FALSE"),
+#     ob_diff = dateonset - dplyr::lag(dateonset, default = dplyr::first(dateonset))) |>
+#   dplyr::filter((ob_flag == "TRUE" & ob_diff > outbreak_window)) |>
+#   dplyr:: filter(is.na(emergencegroup)==F)
+#
+# e_test <- df_sec |> dplyr::pull(epid)
 
+# New Code
 df_sec <- positives.clean.01 |>
   dplyr::arrange(place.admin.0, measurement, dateonset) |>
   dplyr::mutate(
     ob_flag = ifelse(place.admin.0 == dplyr::lag(place.admin.0, default = dplyr::first(place.admin.0)) &
                        measurement == dplyr::lag(measurement, default = dplyr::first(measurement)),
                      "TRUE", "FALSE"),
+    ob_flag_emg = ifelse(emergencegroup == dplyr::lag(emergencegroup, default = dplyr::first(emergencegroup)), "TRUE", "FALSE"),
+    ob_emeg_ctry = stringr::str_sub(emergencegroup, 1, 3),
+    ob_emg_check = ifelse(ob_emeg_ctry == admin0whocode, "TRUE", "FALSE"),
     ob_diff = dateonset - dplyr::lag(dateonset, default = dplyr::first(dateonset))) |>
-  dplyr::filter((
-    (ob_flag == "TRUE" & ob_diff > outbreak_window))) |>
+  dplyr::filter((ob_flag == "TRUE" & ob_diff > outbreak_window) |
+                  (ob_flag == "TRUE" & ob_flag_emg == "FALSE" & ob_emg_check == "FALSE" & ob_diff > 180)) |>
+  dplyr::select(-ob_emeg_ctry, -ob_emg_check, -ob_flag_emg ) |>
   dplyr:: filter(is.na(emergencegroup)==F)
+
+# df_sec1 <- df_sec1 |> dplyr::filter(!epid %in% e_test)
 
 #Pull Together
 df_all <- dplyr::bind_rows(df_ob, df_sec)
@@ -118,10 +138,15 @@ df_first <- positives.clean.01 |>
     ob_flag = ifelse(place.admin.0 == dplyr::lag(place.admin.0, default = dplyr::first(place.admin.0)) &
                        measurement == dplyr::lag(measurement, default = dplyr::first(measurement)),
                      "TRUE", "FALSE"),
+    ob_flag_emg = ifelse(emergencegroup == dplyr::lag(emergencegroup, default = dplyr::first(emergencegroup)), "TRUE", "FALSE"),
+    ob_emeg_ctry = stringr::str_sub(emergencegroup, 1, 3),
+    ob_emg_check = ifelse(ob_emeg_ctry == admin0whocode, "TRUE", "FALSE"),
     diff = dateonset - dplyr::lag(dateonset, default = dplyr::first(dateonset))) |>
   dplyr::filter((dplyr::row_number()==1) |
            ob_flag == "FALSE" |
-           (ob_flag == "TRUE" & diff > outbreak_window)) |>
+           (ob_flag == "TRUE" & diff > outbreak_window) |
+          (ob_flag == "TRUE" & ob_flag_emg == "FALSE" & ob_emg_check == "FALSE" & diff > 180)) |>
+  dplyr::select(-ob_emeg_ctry, -ob_emg_check, -ob_flag_emg ) |>
   dplyr::filter(is.na(emergencegroup)==F) |>
   dplyr::group_by(place.admin.0, measurement) |>
   dplyr::mutate(ob_count = dplyr::row_number(),
