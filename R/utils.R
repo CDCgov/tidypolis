@@ -1067,7 +1067,10 @@ bind_and_reconcile <- function(new_data, old_data) {
   old_data <- as.data.frame(old_data)
 
   for (name in old_names) {
-    class(new_data[, name]) <- classes_old[name][[1]]
+    # Check if old columns exist in the new data
+    if (name %in% names(new_data)) {
+      class(new_data[, name]) <- classes_old[name][[1]]
+    }
   }
 
   new_data <- dplyr::as_tibble(new_data)
