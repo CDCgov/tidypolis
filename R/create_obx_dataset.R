@@ -6,6 +6,9 @@ v_type <- c("cVDPV 2", "cVDPV 3", "cVDPV 1")
 v_type1 <- c("cVDPV 2", "cVDPV 3", "cVDPV 1",
              "cVDPV1andcVDPV2", "cVDPV2andcVDPV3","VDPV1andcVDPV2", "CombinationWild1-cVDPV 2")
 
+`%m-%` <- lubridate::`%m-%`
+
+
 # IPV Only Using Countries to Flag
 # Convert to spreadsheet or reference spatial object such as the map visulizations
 ipv_only <- c("CANADA", "GERMANY", "FINLAND", "ISRAEL", "POLAND" , "SPAIN", "UKRAINE", "THE UNITED KINGDOM", "UNITED STATES OF AMERICA")
@@ -21,15 +24,6 @@ breakthrough <- 28
 cov_pct_lvl <- 6
 
 
-# set_parameters( breakthrough_min_date = 21,
-#                 breakthrough_middle_date = 180,
-#                 breakthrough_max_date = 365,
-#                 detection_pre_sia_date = 90,
-#                 start_date = start.date,
-#                 end_date = end.date,
-#                 recent_sia_start_year = lubridate::year(Sys.Date())-2)
-#                 #This is used to restrict "Recent SIA with breakthrough transmission" figures to 'recent' SIAs in f.geompoint.case())
-
 # AFP - 3543 / Post-AFP 3561 (8)
 # ENV has 236 duplicates in Post
 # Contact has 6 dup epids
@@ -40,13 +34,16 @@ positives.clean.01 <- raw.data[["pos"]] |>
   dplyr::filter(measurement %in% v_type) |>
   dplyr::arrange(place.admin.0, measurement, dateonset) |>
   dplyr::select(place.admin.0, place.admin.1, place.admin.2, adm0guid, adm1guid, admin2guid, epid, measurement, dateonset, emergencegroup,
-         is.breakthrough, source, report_date, admin0whocode) |>
+         is.breakthrough, source, report_date, admin0whocode, datenotificationtohq) |>
   dplyr::rename(adm2guid = admin2guid) |>
   dplyr::distinct(epid, measurement, .keep_all = T) |>
   dplyr::mutate(surv = dplyr::case_when(
     source == "AFP" ~ "AFP",
     source == "ENV" ~ "ES",
-    source %in% c("Community", "Contact", "Healthy") ~ "Other"))
+    source %in% c("Community", "Contact", "Healthy") ~ "Other")) |>
+  # Fill in notification date if missing
+  dplyr::mutate(report_date = dplyr::if_else(is.na(report_date)==T, lubridate::as_date(datenotificationtohq), lubridate::as_date(report_date))) |>
+  dplyr::select(-datenotificationtohq)
 
 
 
@@ -319,16 +316,16 @@ df_all <- df_all |>
              ob_no = ob_status) |>
    # Flag to determine the current status of the outbreak based on SOPs
            dplyr::mutate(ob_status = dplyr::case_when(
-               most_recent >= lubridate::floor_date(active.end.date - months(6), "week", 7) ~ "1_active_u6mos",
-               most_recent < lubridate::floor_date(active.end.date - months(6), "week", 7) &
-               most_recent >= lubridate::floor_date(active.end.date - months(12), "week", 7)~ "2_active_6-12mos",
+               most_recent >= lubridate::floor_date(active.end.date %m-%  months(6), "week", 7) ~ "1_active_u6mos",
+               most_recent < lubridate::floor_date(active.end.date %m-% months(6), "week", 7) &
+               most_recent >= lubridate::floor_date(active.end.date %m-% months(12), "week", 7)~ "2_active_6-12mos",
                TRUE ~ "3_inactive"),
    # Binary variable collasping all active catergories
                ob_status_bin = dplyr::case_when(
                  ob_status == "3_inactive" ~ "inactive",
                  ob_status %in% c("1_active_u6mos", "2_active_6-12mos") ~ "active"),
    # Identifies if country is within six months and does not expect to have conducted outbreak response
-               ob_new = dplyr::if_else(ob_srt_d0 >= lubridate::floor_date(active.end.date - months(1), "week", 7), "1_y", "2_n"),
+               ob_new = dplyr::if_else(ob_srt_d0 >= lubridate::floor_date((active.end.date %m-% months(1)), "week", 7), "1_y", "2_n"),
    # Uses manual list to identify IPV Countries, need to automate
                ipv_ctry = dplyr::if_else(ob_country %in% ipv_only, "IPV Only", NA_character_)) |>
           dplyr::relocate(ob_status, .after = ob_no) |>
@@ -347,7 +344,8 @@ df_all <- df_all |>
 sia_data  <- raw.data$sia |>
   dplyr::filter(yr.sia >= lubridate::year(start.date) &
                   status == "Done") |>
-  dplyr::mutate(activity.end.date =dplyr::if_else(sia.code == "ETH-2021-002", lubridate::as_date("2021-11-15"),activity.end.date))
+  dplyr::mutate(activity.end.date =dplyr::if_else(sia.code == "ETH-2021-002", lubridate::as_date("2021-11-15"),activity.end.date),
+                place.admin.1 = dplyr::if_else(place.admin.1=="GILGIT BALTISTAN" & place.admin.0 == "PAKISTAN", "GBALTISTAN", place.admin.1))
 
 ob_sias <- list()
 sia_rds1 <- list()
@@ -490,8 +488,8 @@ sia_rds <- sia_sub2 |>
       dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl  & sia_time_diff <= 21 ~ "Y",
       TRUE ~ "N"),
     sia_cat = dplyr::case_when(
-      ob_R0 == "Y" ~ "1_R0",
-      mopup_check == "Y" ~ "3_mop-up",
+      # ob_R0 == "Y" ~ "1_R0",
+      # mopup_check == "Y" ~ "3_mop-up",
       TRUE ~ "2_siard")) |>
   dplyr::arrange(sia_date, sia_cat)
 
@@ -557,7 +555,18 @@ ob_table_final <- df_all2 |>
                              ipv_ctry == "IPV Only" ~ "5_ipvctry"),
             # Surveillance Delay - if Epid from virus that was first reported based on report_date differs first virus based on onset
              delayed_surv = dplyr::if_else(
-                            fv_epid == ob_srt_epid, "2_n", "1_y"))
+                            fv_epid == ob_srt_epid, "2_n", "1_y"),
+            #Outbreak length
+             ob_length = dplyr::case_when(
+               ob_status_bin == "active" ~  as.numeric(lubridate::today() - ob_srt_d0),
+               ob_status_bin == "inactive" & lubridate::as_date(most_recent) <  ob_srt_d0 ~  as.numeric((ob_srt_d0 + lubridate::days(183)) - ob_srt_d0),
+               ob_status_bin == "inactive" & lubridate::as_date(most_recent) >=  ob_srt_d0 ~  as.numeric((lubridate::as_date(most_recent)) - ob_srt_d0)),
+            ob_length = round(ob_length / 365.25,2),
+            # Time from first virus to most recent
+            virus_time = round(as.numeric(lubridate::as_date(most_recent) - fv_onset)/365.25,2))
+
+
+
 
 
 return(ob_table_final)

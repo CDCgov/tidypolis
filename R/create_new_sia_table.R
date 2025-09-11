@@ -8,8 +8,8 @@ source(here::here("R/gen_obx_br_rds.R"))
 raw.data <- sirfunctions::get_all_polio_data(size="medium")
 
 
-raw.data$pos <- raw.data$pos |>
-                  dplyr::filter(!epid == "ISR-1-11-24-26")
+# raw.data$pos <- raw.data$pos |>
+#                   dplyr::filter(!epid == "ISR-1-11-24-26")
 # Nearest neighbor data
 nn_first <- sirfunctions::edav_io(io = "read", default_dir = "GID/GIDMEA/giddatt", file_loc = "data_raw/nn_fv_obs.rds")
 
@@ -38,7 +38,7 @@ positives.clean.01 <- raw.data[["pos"]] |>
   dplyr::filter(measurement %in% v_type) |>
   dplyr::arrange(place.admin.0, measurement, dateonset) |>
   dplyr::select(place.admin.0, place.admin.1, place.admin.2, adm0guid, adm1guid, admin2guid, epid, measurement, dateonset, emergencegroup,
-                is.breakthrough, source, report_date, admin0whocode) |>
+                is.breakthrough, source, report_date, admin0whocode, datenotificationtohq) |>
   dplyr::rename(adm2guid = admin2guid) |>
   dplyr::distinct(epid, measurement, .keep_all = T) |>
   dplyr::mutate(surv = dplyr::case_when(
@@ -47,7 +47,11 @@ positives.clean.01 <- raw.data[["pos"]] |>
     source %in% c("Community", "Contact", "Healthy") ~ "Other")) |>
   #Manual fix for the epid causing problems in Yemen for T2
   dplyr::mutate(dateonset =
-                  dplyr::if_else(epid == "YEM-ABY-2021-627-08-C6", lubridate::as_date("2021-09-29"),dateonset))
+                  dplyr::if_else(epid == "YEM-ABY-2021-627-08-C6", lubridate::as_date("2021-09-29"),dateonset)) |>
+  dplyr::mutate(place.admin.1 =
+                  dplyr::if_else(epid == "KP/13/19/H-B-015", "KPAKHTUNKHWA", place.admin.1))|>
+  dplyr::mutate(report_date = dplyr::if_else(is.na(report_date)==T, lubridate::as_date(datenotificationtohq), lubridate::as_date(report_date))) |>
+  dplyr::select(-datenotificationtohq)
 
 
 
@@ -56,7 +60,7 @@ obx_sia_rds <- list()
 obx_sia_full_list <- list()
 
 for (i in 1:nrow(obx_table)){
-# x <- "ANG-cVDPV2-1"
+# x <- "PAK-cVDPV2-2"
 x <- obx_table$ob_id[i]
 df_sub <- obx_table |> dplyr::filter(ob_id == x)
 
@@ -90,7 +94,8 @@ sia_data  <- raw.data$sia |>
   dplyr::mutate(activity.end.date = dplyr::if_else(is.na(activity.end.date)==T,
                                                    activity.start.date,
                                                    activity.end.date),
-                activity.end.date = dplyr::if_else(sia.code == "ETH-2021-002", lubridate::as_date("2021-11-15"),activity.end.date))
+                activity.end.date = dplyr::if_else(sia.code == "ETH-2021-002", lubridate::as_date("2021-11-15"),activity.end.date),
+                place.admin.1 = dplyr::if_else(place.admin.1 =="GILGIT BALTISTAN" & place.admin.0 == "PAKISTAN", "GBALTISTAN", place.admin.1))
 
 if(sero == "cVDPV 2"){
 
@@ -131,6 +136,7 @@ sia_sub_all <- sia_sub |>
     adm2guid = dplyr::first(adm2guid),
     sia_code = dplyr::first(sia.code), # keep only first sia.code to match
     code_count = dplyr::n_distinct(sia.code),
+    code_list = list(unique(sia.code)),
     sia_country = dplyr::first(place.admin.0),
     sia_dist = dplyr::n_distinct(place.admin.2),
     sia_prov = dplyr::n_distinct(place.admin.1),
@@ -159,17 +165,23 @@ sia_sub_all <- sia_sub |>
       dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl  & sia_time_diff <= 21 ~ "Y",
       TRUE ~ "N"),
     sia_cat = dplyr::case_when(
-      mopup_check == "Y" | sia_type == "Mop-Up" ~ "3_mop-up",
-      ob_R0 == "Y" ~ "1_R0",
+      # mopup_check == "Y" | sia_type == "Mop-Up" ~ "3_mop-up",
+      # sia_type == "Mop-Up" ~ "3_mop-up",
+      # ob_R0 == "Y" ~ "1_R0",
       TRUE ~ "2_siard")) |>
   dplyr::arrange(sia_date, sia_cat)
 
-
 # Identify first and second SIA responses
-
-
+# man_planned <- c("BEN-2019-005", "BEN-2019-006", "BEN-2020-004", "BEN-2020-010")
+# Manual review
 sia_sub2 <-  sia_sub_all |>
   dplyr::filter(sia_cat == "2_siard")
+  # dplyr::filter(!sia_code %in% man_planned)
+
+
+## JP Start here to update code |> need to label the all SIAs as the activity date of SIA1 and SIA2
+## Double check then for SIA BR rounds of to ensure in code
+## When labels multiple codes can have First SIA and Second SIA date.
 
 sia_int <- sia_sub2 |>
   dplyr::mutate(
@@ -181,9 +193,16 @@ sia_int <- sia_sub2 |>
 
 sia_sub_all <- dplyr::left_join(sia_sub_all, sia_int, by = "sia_code")
 
+sia_sub2_codes <- sia_sub_all |>
+                        dplyr::filter(sia_cat == "2_siard") |>
+                        dplyr::filter(is.na(sia_rd_viz)==T) |>
+                        dplyr::pull(sia_date)
+##
+sia_fun <- sia_sub |>
+   dplyr::filter(lubridate::as_date(activity.start.date) %in% sia_sub2_codes)
 
 
-br_sub <- gen_obx_sia_br_rds(positives.clean.01,sia_sub2,df_sub)
+br_sub <- gen_obx_sia_br_rds(positives.clean.01,sia_sub, sia_sub2,sia_fun, df_sub)
 
 obx_sia_full_list[[i]] <- sia_sub_all
 obx_sia_rds[[i]] <- br_sub
@@ -223,5 +242,5 @@ sia_full_all <- sia_full_all |>
 
 # Need to investigate ETH-cVDPV2-1-5
 
-rm(br_sub, df_sub, dist, obx_sia_rds, positives.clean.01, prov, sia_data, sia_sub, sia_sub2 , x)
+rm(br_sub, df_sub, dist, obx_sia_rds, prov, sia_data, sia_sub, sia_sub2 , x)
 
