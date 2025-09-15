@@ -8,7 +8,7 @@ run_obx_sia_graph(
   obx_table = obx_table,
   sia_full_all = sia_full_all,
   sia_obx_table = sia_obx_table,
-  run_type = "all",
+  run_type = "active_ob",
   save_graph = "yes",
   cdc_upload = "yes",
   viz = "sen_check"
@@ -124,7 +124,7 @@ emg_cols = c(
   "PAK-PWR-1" ="#d8bfd8",
   "PAK-QTA-1" =  "#05998c",
   "PAK-TOR-1" = "#8B0A50",
-  "PAK−KHI−2" = "#ff7f50",
+  "PAK−KHI−2" = "dodgerblue",
 
   "PHL-NCR-1" = "#ec5800",
   "PHL-NCR-2" = "#009b7d",

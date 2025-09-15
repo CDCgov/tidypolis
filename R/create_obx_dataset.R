@@ -42,7 +42,12 @@ positives.clean.01 <- raw.data[["pos"]] |>
     source == "ENV" ~ "ES",
     source %in% c("Community", "Contact", "Healthy") ~ "Other")) |>
   # Fill in notification date if missing
-  dplyr::mutate(report_date = dplyr::if_else(is.na(report_date)==T, lubridate::as_date(datenotificationtohq), lubridate::as_date(report_date))) |>
+  dplyr::mutate(dateonset =
+                  dplyr::if_else(epid == "YEM-ABY-2021-627-08-C6", lubridate::as_date("2021-09-29"),dateonset),
+                place.admin.1 =
+                  dplyr::if_else(epid == "KP/13/19/H-B-015", "KPAKHTUNKHWA", place.admin.1),
+                place.admin.1 = dplyr::if_else(epid == "19310", "SABAH", place.admin.1),
+                report_date = dplyr::if_else(is.na(report_date)==T, lubridate::as_date(datenotificationtohq), lubridate::as_date(report_date))) |>
   dplyr::select(-datenotificationtohq)
 
 
@@ -354,11 +359,12 @@ sia_rds1 <- list()
 # Identify all associated SIAs that are true rounds - will be needed for ob_sia table after
 for (i in 1:nrow(df_all)){
 
-# x <- "SOM-cVDPV3-1"
+# x <- "PAK-cVDPV2-2"
 x <- df_all$ob_id[i]
 df_sub <- df_all |> dplyr::filter(ob_id == x)
 
 ob_start <- df_sub$ob_srt_d0
+ob_admin1 <- df_sub$ob_srt_admin1
 first_virus <- df_sub$fv_onset
 date_end <- df_sub$sia_date_upper
 ctry <- df_sub$ob_country
@@ -433,6 +439,80 @@ if(sero == "cVDPV 2"){
 }
 
 
+sia_sub_all <- sia_sub |>
+  # Filter out rounds labeled mop-up
+  dplyr::mutate(activity.start.date = lubridate::as_date(activity.start.date),
+                activity.end.date = lubridate::as_date(activity.end.date)) |>
+  dplyr::arrange(activity.start.date, sia.code) |>
+  dplyr::group_by(activity.start.date) |>
+  dplyr::summarise(
+    adm2guid = dplyr::first(adm2guid),
+    sia_code = dplyr::first(sia.code), # keep only first sia.code to match
+    code_count = dplyr::n_distinct(sia.code),
+    code_list = list(unique(sia.code)),
+    sia_country = dplyr::first(place.admin.0),
+    sia_dist = dplyr::n_distinct(place.admin.2),
+    sia_prov = dplyr::n_distinct(place.admin.1),
+    sia_type = dplyr::first(activity.type),
+    sia_date = dplyr::first(activity.start.date),
+    sia_date_end = dplyr::first(activity.end.date),
+    sia_vac = dplyr::first(vaccine.type)) |>
+  dplyr::select(-activity.start.date, -adm2guid) |>
+  dplyr::arrange(sia_date) |>
+  dplyr::mutate(
+    ob_id = x,
+    cov_pct_dist = sia_dist / dist_c * 100,
+    cov_pct_prov = sia_prov / prov_c * 100) |>
+  dplyr::arrange(sia_date) |>
+  # Add in time difference in SIAS
+  dplyr::mutate(
+    sia_no = dplyr::row_number(),
+    # Identify any R0s occuring within 14 days of the OB declaration
+    ob_R0 = dplyr::if_else( sia_date > ob_start &
+                              sia_date <= (ob_start + lubridate::days(14)), "Y", "N"),
+    # Time between SIAS
+    sia_time_diff = sia_date - dplyr::lag(sia_date, default= ob_start),
+    # Time between SIAS
+    mopup_check = dplyr::case_when(
+      sia_type == "Mop-Up" ~ "Y",
+      dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl  & sia_time_diff <= 21 ~ "Y",
+      TRUE ~ "N"),
+    sia_cat = dplyr::case_when(
+      # mopup_check == "Y" | sia_type == "Mop-Up" ~ "3_mop-up",
+      # sia_type == "Mop-Up" ~ "3_mop-up",
+      # ob_R0 == "Y" ~ "1_R0",
+      TRUE ~ "2_siard")) |>
+  dplyr::arrange(sia_date, sia_cat)
+
+
+
+if (any(sia_sub_all$code_count > 1)){
+
+  # Create new proxy
+  test1 <- sia_sub |>
+    dplyr::group_by(yr.sia, activity.start.date) |>
+    dplyr::count() |>
+    dplyr::group_by(yr.sia) |>
+    dplyr::mutate(root_id = dplyr::row_number()) |>
+    dplyr::ungroup() |>
+    dplyr::select(-n, -yr.sia)
+
+  sia_sub <- dplyr::left_join(sia_sub, test1, by = c("activity.start.date"))
+
+  sia_sub <- sia_sub |>
+    dplyr::mutate(ctry_root = stringr::str_sub(sia.code, 1, 3),
+                  root_id_form = formatC(root_id, width=3, flag="0"),
+                  sia_code_polis = sia.code,
+                  sia.code = paste0(ctry_root,"-",yr.sia,"-",root_id_form,"-prox"))
+
+
+}else{
+
+
+}
+
+
+
 # Need to reduce here the number of SIAs. Examples of the same SIA code having multiple activity types with the same master code. Some are Mop-ups, others SIA dates
 # Saving grace no duplicated admin 2 levels on each activity date. So will spread out we can combine all here
 # may need to add in a list here for what SIA codes are in the main one
@@ -442,7 +522,7 @@ sia_sub2 <-  dplyr::left_join(sia_sub, pop, by = "adm2guid")
 
 sia_sub2 <- sia_sub2 |>
   # Filter out rounds labeled mop-up
-  dplyr::filter(!activity.type == "Mop-Up") |>
+  # dplyr::filter(!activity.type == "Mop-Up") |>
   dplyr::mutate(activity.start.date = lubridate::as_date(activity.start.date),
                 activity.end.date = lubridate::as_date(activity.end.date),
   # Calculate window of SIA response
@@ -495,6 +575,7 @@ sia_rds <- sia_sub2 |>
 
 
 
+
 # # Pull out total number of SIA coded rounds:
 sia_out <- sia_rds |>
   dplyr::summarise(
@@ -503,21 +584,35 @@ sia_out <- sia_rds |>
     sia_first = dplyr::first(sia_date),
     sia_last = dplyr::last(sia_date))
 
+sia_out_short <- sia_rds |>
+                  dplyr::filter(!sia_type == "Mop-Up") |>
+                  dplyr::summarise(
+                    id = x,
+                    snids_rds = dplyr::n())
+
+sia_out <- dplyr::left_join(sia_out, sia_out_short, by = "id")
+
+
+# Pull out First and Second SIA in the coverage zone
+
+sia_cov <- sia_sub |>
+             dplyr::filter(activity.start.date >= ob_start &
+                           place.admin.1 == ob_admin1) |>
+             dplyr::arrange(activity.start.date) |>
+             dplyr::distinct(sia.code, .keep_all = T)
 
 
 
-# # Focus on SNID / NIDS and CRS that do not appear as
-# Pull out any that do not cover
-# Some R0 can be big agains the
-sia_out2 <-  sia_rds |>
-  dplyr::filter(sia_cat =="2_siard" ) |>
+sia_out2 <-  sia_cov |>
          dplyr::summarise(
            id = x,
-           snids_rds = dplyr::n(),
-           first_reg_sia = dplyr::first(sia_date),
-           first_reg_sia_end = dplyr::first(sia_date_end),
-           sec_reg_sia = dplyr::nth(sia_date, 2),
-           sec_reg_sia_end = dplyr::nth(sia_date_end, 2))
+           # snids_rds = dplyr::n(),
+           first_reg_sia_code = dplyr::first(sia.code),
+           first_reg_sia = dplyr::first(activity.start.date),
+           first_reg_sia_end = dplyr::first(activity.end.date),
+           sec_reg_sia_code = dplyr::nth(sia.code, 2),
+           sec_reg_sia = dplyr::nth(activity.start.date, 2),
+           sec_reg_sia_end = dplyr::nth(activity.end.date, 2))
            # thrd_reg_sia = dplyr::nth(sia_date, 3),
            # last_reg_sia = dplyr::last(sia_date))
 
@@ -535,8 +630,7 @@ ob_sias_all <- do.call(rbind, ob_sias)
 sia_rds_all <- do.call(rbind, sia_rds1)
 
 
-df_all2 <- dplyr::left_join(df_all, ob_sias_all, by = c("ob_id"="id")) |>
-              dplyr::relocate(snids_rds, .after = tot_rds_dataset)
+df_all2 <- dplyr::left_join(df_all, ob_sias_all, by = c("ob_id"="id"))
 
 # rm(df_all, df_sub, dist, ob_sias, pop, prov, sia_out, sia_out2, sia_rds, sia_rds1, sia_sub, sia_sub2)
 
@@ -551,6 +645,8 @@ ob_table_final <- df_all2 |>
                              ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds >= 2 & most_recent > (sec_reg_sia_end + lubridate::days(28)) ~ "1_y",
                              ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds >= 2 & most_recent <= (sec_reg_sia_end + lubridate::days(28)) ~ "2_n",
                              ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds <2 | ipv_ctry == "yes" ~ "3_<2Rds",
+                             ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds >=2  & (most_recent < ob_srt_d0)  ~ "2_n",
+                             ob_new == "2_n" &  is.na(ipv_ctry) == T & snids_rds >=2  & is.na(sec_reg_sia) ~ "3_<2Rds",
                              ob_new == "1_y" &  is.na(ipv_ctry) == T ~ "4_newob",
                              ipv_ctry == "IPV Only" ~ "5_ipvctry"),
             # Surveillance Delay - if Epid from virus that was first reported based on report_date differs first virus based on onset

@@ -5,11 +5,10 @@
 source(here::here("R/create_obx_dataset.R"))
 source(here::here("R/gen_obx_br_rds.R"))
 
-raw.data <- sirfunctions::get_all_polio_data(size="medium")
+# raw.data <- sirfunctions::get_all_polio_data(size="medium")
 
 
-# raw.data$pos <- raw.data$pos |>
-#                   dplyr::filter(!epid == "ISR-1-11-24-26")
+
 # Nearest neighbor data
 nn_first <- sirfunctions::edav_io(io = "read", default_dir = "GID/GIDMEA/giddatt", file_loc = "data_raw/nn_fv_obs.rds")
 
@@ -47,10 +46,11 @@ positives.clean.01 <- raw.data[["pos"]] |>
     source %in% c("Community", "Contact", "Healthy") ~ "Other")) |>
   #Manual fix for the epid causing problems in Yemen for T2
   dplyr::mutate(dateonset =
-                  dplyr::if_else(epid == "YEM-ABY-2021-627-08-C6", lubridate::as_date("2021-09-29"),dateonset)) |>
-  dplyr::mutate(place.admin.1 =
-                  dplyr::if_else(epid == "KP/13/19/H-B-015", "KPAKHTUNKHWA", place.admin.1))|>
-  dplyr::mutate(report_date = dplyr::if_else(is.na(report_date)==T, lubridate::as_date(datenotificationtohq), lubridate::as_date(report_date))) |>
+                  dplyr::if_else(epid == "YEM-ABY-2021-627-08-C6", lubridate::as_date("2021-09-29"),dateonset),
+                place.admin.1 =
+                  dplyr::if_else(epid == "KP/13/19/H-B-015", "KPAKHTUNKHWA", place.admin.1),
+                place.admin.1 = dplyr::if_else(epid == "19310", "SABAH", place.admin.1),
+                report_date = dplyr::if_else(is.na(report_date)==T, lubridate::as_date(datenotificationtohq), lubridate::as_date(report_date))) |>
   dplyr::select(-datenotificationtohq)
 
 
@@ -58,9 +58,11 @@ positives.clean.01 <- raw.data[["pos"]] |>
 # Gen list to catch all round sub tables to merge after
 obx_sia_rds <- list()
 obx_sia_full_list <- list()
+sia_data_clean <- list()
+
 
 for (i in 1:nrow(obx_table)){
-# x <- "PAK-cVDPV2-2"
+ # x <- "BOT-cVDPV2-1"
 x <- obx_table$ob_id[i]
 df_sub <- obx_table |> dplyr::filter(ob_id == x)
 
@@ -73,6 +75,8 @@ sero <- df_sub$ob_type
 ob_start <- df_sub$ob_srt_d0
 ob_end <- df_sub$most_recent
 date_end <- df_sub$sia_date_upper
+sia_code1 <- df_sub$first_reg_sia_code
+sia_code2 <- df_sub$sec_reg_sia_code
 
 # Required Pop
 dist <- raw.data$global.dist |>
@@ -171,12 +175,80 @@ sia_sub_all <- sia_sub |>
       TRUE ~ "2_siard")) |>
   dplyr::arrange(sia_date, sia_cat)
 
-# Identify first and second SIA responses
-# man_planned <- c("BEN-2019-005", "BEN-2019-006", "BEN-2020-004", "BEN-2020-010")
-# Manual review
+
+
+if (any(sia_sub_all$code_count > 1)){
+
+# Create new proxy
+test1 <- sia_sub |>
+dplyr::group_by(yr.sia, activity.start.date) |>
+dplyr::count() |>
+dplyr::group_by(yr.sia) |>
+dplyr::mutate(root_id = dplyr::row_number()) |>
+dplyr::ungroup() |>
+dplyr::select(-n, -yr.sia)
+
+sia_sub <- dplyr::left_join(sia_sub, test1, by = c("activity.start.date"))
+
+sia_sub <- sia_sub |>
+            dplyr::mutate(ctry_root = stringr::str_sub(sia.code, 1, 3),
+                          root_id_form = formatC(root_id, width=3, flag="0"),
+                          sia_code_polis = sia.code,
+                          sia.code = paste0(ctry_root,"-",yr.sia,"-",root_id_form,"-prox"))
+sia_sub_all <- sia_sub |>
+  # Filter out rounds labeled mop-up
+  dplyr::mutate(activity.start.date = lubridate::as_date(activity.start.date),
+                activity.end.date = lubridate::as_date(activity.end.date)) |>
+  dplyr::arrange(activity.start.date, sia.code) |>
+  dplyr::group_by(activity.start.date) |>
+  dplyr::summarise(
+    adm2guid = dplyr::first(adm2guid),
+    sia_code = dplyr::first(sia.code), # keep only first sia.code to match
+    code_count = dplyr::n_distinct(sia.code),
+    # code_list = list(unique(sia.code)),
+    sia_country = dplyr::first(place.admin.0),
+    sia_dist = dplyr::n_distinct(place.admin.2),
+    sia_prov = dplyr::n_distinct(place.admin.1),
+    sia_type = dplyr::first(activity.type),
+    sia_date = dplyr::first(activity.start.date),
+    sia_date_end = dplyr::first(activity.end.date),
+    sia_vac = dplyr::first(vaccine.type)) |>
+  dplyr::select(-activity.start.date, -adm2guid) |>
+  dplyr::arrange(sia_date) |>
+  dplyr::mutate(
+    ob_id = x,
+    cov_pct_dist = sia_dist / dist_c * 100,
+    cov_pct_prov = sia_prov / prov_c * 100) |>
+  dplyr::arrange(sia_date) |>
+  # Add in time difference in SIAS
+  dplyr::mutate(
+    sia_no = dplyr::row_number(),
+    # Identify any R0s occuring within 14 days of the OB declaration
+    ob_R0 = dplyr::if_else( sia_date > ob_start &
+                            sia_date <= (ob_start + lubridate::days(14)), "Y", "N"),
+    # Time between SIAS
+    sia_time_diff = sia_date - dplyr::lag(sia_date, default= ob_start),
+    # Time between SIAS
+    mopup_check = dplyr::case_when(
+      sia_type == "Mop-Up" ~ "Y",
+      dplyr::row_number() != 1 & sia_type == "CR" & cov_pct_dist < cov_pct_lvl  & sia_time_diff <= 21 ~ "Y",
+      TRUE ~ "N"),
+    sia_cat = dplyr::case_when(
+      # mopup_check == "Y" | sia_type == "Mop-Up" ~ "3_mop-up",
+      # sia_type == "Mop-Up" ~ "3_mop-up",
+      # ob_R0 == "Y" ~ "1_R0",
+      TRUE ~ "2_siard")) |>
+  dplyr::arrange(sia_date, sia_cat)
+
 sia_sub2 <-  sia_sub_all |>
   dplyr::filter(sia_cat == "2_siard")
-  # dplyr::filter(!sia_code %in% man_planned)
+
+}else{
+  sia_sub2 <-  sia_sub_all |>
+dplyr::filter(sia_cat == "2_siard")
+
+}
+
 
 
 ## JP Start here to update code |> need to label the all SIAs as the activity date of SIA1 and SIA2
@@ -186,12 +258,13 @@ sia_sub2 <-  sia_sub_all |>
 sia_int <- sia_sub2 |>
   dplyr::mutate(
     sia_rd_viz = dplyr::case_when(
-      dplyr::row_number() == 1 ~ "first_sia",
-      dplyr::row_number() == 2 ~ "second_sia",
+      sia_code == sia_code1 ~ "first_sia",
+      sia_code == sia_code2 ~ "second_sia",
       TRUE ~ NA_character_)) |>
-  dplyr::select(sia_code, sia_rd_viz)
+  dplyr::select(sia_code, sia_date, sia_rd_viz)
 
-sia_sub_all <- dplyr::left_join(sia_sub_all, sia_int, by = "sia_code")
+
+sia_sub_all <- dplyr::left_join(sia_sub_all, sia_int, by = c("sia_code", "sia_date"))
 
 sia_sub2_codes <- sia_sub_all |>
                         dplyr::filter(sia_cat == "2_siard") |>
@@ -204,13 +277,14 @@ sia_fun <- sia_sub |>
 
 br_sub <- gen_obx_sia_br_rds(positives.clean.01,sia_sub, sia_sub2,sia_fun, df_sub)
 
+sia_data_clean[[i]] <- sia_sub
 obx_sia_full_list[[i]] <- sia_sub_all
 obx_sia_rds[[i]] <- br_sub
 cli::cli_alert(paste0(x, " outbreak completed"))
 }
 
+sia_data_clean_all <- do.call(plyr::rbind.fill, sia_data_clean)
 sia_full_all <- do.call(plyr::rbind.fill, obx_sia_full_list)
-
 sia_obx_table <- do.call(plyr::rbind.fill, obx_sia_rds)
 
 # Table aligns outbreaks current for second SIA Start / End date in first line
@@ -242,5 +316,5 @@ sia_full_all <- sia_full_all |>
 
 # Need to investigate ETH-cVDPV2-1-5
 
-rm(br_sub, df_sub, dist, obx_sia_rds, prov, sia_data, sia_sub, sia_sub2 , x)
+rm(br_sub, df_sub, dist, obx_sia_rds, prov, sia_data, sia_sub, sia_sub2, x)
 

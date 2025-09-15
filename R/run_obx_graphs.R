@@ -11,7 +11,7 @@ run_obx_sia_graph<- function(obx_table, raw.data, sia_obx_table, run_type, sia_f
 if(run_type == "all"){
 
   for (i in 1:nrow(obx_table)){
-     # x <- "MAA-cVDPV2-1"
+     # x <- "ANG-cVDPV2-1"
     x <- obx_table$ob_id[i]
     df_sub <- obx_table |> dplyr::filter(ob_id == x)
 

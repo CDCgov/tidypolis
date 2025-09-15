@@ -49,7 +49,7 @@ v_map <- raw.data[["pos"]] |>
                 place.admin.0 == ctry) |>
   dplyr::arrange(place.admin.0, measurement, dateonset) |>
   dplyr::select(place.admin.0, place.admin.1, place.admin.2, adm0guid, adm1guid, admin2guid, epid, measurement, dateonset, emergencegroup,
-                is.breakthrough, source, report_date, admin0whocode) |>
+                is.breakthrough, source, report_date, admin0whocode, datenotificationtohq) |>
   dplyr::rename(adm2guid = admin2guid) |>
   dplyr::distinct(epid, measurement, .keep_all = T) |>
   dplyr::mutate(surv = dplyr::case_when(
@@ -71,7 +71,14 @@ v_map <- raw.data[["pos"]] |>
       measurement == "cVDPV 3" |
         measurement == "WILD 3"  ~ list(c("bOPV", "tOPV", "mOPV3")))) |>
   dplyr::arrange(place.admin.1) |>
-  dplyr::mutate(place.admin.1 = factor(place.admin.1, levels=unique(place.admin.1)))
+  dplyr::mutate(place.admin.1 = factor(place.admin.1, levels=unique(place.admin.1))) |>
+  dplyr::mutate(dateonset =
+                  dplyr::if_else(epid == "YEM-ABY-2021-627-08-C6", lubridate::as_date("2021-09-29"),dateonset),
+                place.admin.1 =
+                  dplyr::if_else(epid == "KP/13/19/H-B-015", "KPAKHTUNKHWA", place.admin.1),
+                place.admin.1 = dplyr::if_else(epid == "19310", "SABAH", place.admin.1),
+                report_date = dplyr::if_else(is.na(report_date)==T, lubridate::as_date(datenotificationtohq), lubridate::as_date(report_date))) |>
+  dplyr::select(-datenotificationtohq)
 
 
 # Pull Day0 Breakthrough Infections
@@ -86,33 +93,40 @@ day0_data <- sia_obx_table |>
 region_virus <- unique(v_map$adm1guid)
 sia_1 <- unique(unlist(v_map$sias))
 
-# Fill in missing SIA data data
-sia_data_sub <- raw.data$sia |>
-  dplyr::filter( place.admin.0 %in% ctry &
-                   adm1guid %in% region_virus &
-                   vaccine.type %in% sia_1 &
-                   status %in% c("Done")) |>
+# # Fill in missing SIA data data
+# sia_data_sub <- raw.data$sia |>
+#   dplyr::filter( place.admin.0 %in% ctry &
+#                    adm1guid %in% region_virus &
+#                    vaccine.type %in% sia_1 &
+#                    status %in% c("Done")) |>
+#   dplyr::mutate(proxy_date_flag = dplyr::case_when(
+#     is.na(sub.activity.end.date)==T ~ "proxy_enddate",
+#     is.na(sub.activity.start.date)==T ~ "proxy_srt_date"),
+#     sub.activity.end.date = dplyr::if_else(is.na(sub.activity.end.date)==T, (sub.activity.start.date + lubridate::days(3)), sub.activity.end.date))
+#
+# if(x == "MAA-cVDPV2-1"){
+#   sia_data_sub <- raw.data$sia |>
+#     dplyr::filter( place.admin.0 %in% ctry &
+#                      vaccine.type %in% sia_1 &
+#                      status %in% c("Done")) |>
+    # dplyr::mutate(proxy_date_flag = dplyr::case_when(
+    #   is.na(sub.activity.end.date)==T ~ "proxy_enddate",
+    #   is.na(sub.activity.start.date)==T ~ "proxy_srt_date"),
+    #   sub.activity.end.date = dplyr::if_else(is.na(sub.activity.end.date)==T, (sub.activity.start.date + lubridate::days(3)), sub.activity.end.date))
+#
+# }else{}
+
+sia_codes1 <- sia_full_all |> dplyr::filter(ob_id == x) |> dplyr::pull(sia_code)
+
+sia_data_sub <- sia_data_clean_all |>
+                  dplyr::filter(sia.code %in% sia_codes1) |>
   dplyr::mutate(proxy_date_flag = dplyr::case_when(
     is.na(sub.activity.end.date)==T ~ "proxy_enddate",
     is.na(sub.activity.start.date)==T ~ "proxy_srt_date"),
     sub.activity.end.date = dplyr::if_else(is.na(sub.activity.end.date)==T, (sub.activity.start.date + lubridate::days(3)), sub.activity.end.date))
 
-if(x == "MAA-cVDPV2-1"){
-  sia_data_sub <- raw.data$sia |>
-    dplyr::filter( place.admin.0 %in% ctry &
-                     vaccine.type %in% sia_1 &
-                     status %in% c("Done")) |>
-    dplyr::mutate(proxy_date_flag = dplyr::case_when(
-      is.na(sub.activity.end.date)==T ~ "proxy_enddate",
-      is.na(sub.activity.start.date)==T ~ "proxy_srt_date"),
-      sub.activity.end.date = dplyr::if_else(is.na(sub.activity.end.date)==T, (sub.activity.start.date + lubridate::days(3)), sub.activity.end.date))
-
-}else{}
 
 sia_data_sub <- sia_data_sub|>
-  dplyr::filter(
-             sub.activity.end.date >= ob_sia_start &
-             sub.activity.end.date <= ob_end ) |>
   dplyr::mutate(activity.start.date = lubridate::ymd(activity.start.date),
          activity.end.date = lubridate::ymd(activity.end.date),
          sia_proxy = "SIA",
@@ -128,10 +142,9 @@ sia_data_sub <- sia_data_sub |>
       sia_rd_viz = NA)
 }else{
 sia_codes <- sia_full_all |>
-                dplyr::select(sia_date, sia_country, sia_rd_viz)
+                dplyr::select(sia_code, sia_rd_viz)
 
-sia_data_sub <- dplyr::left_join(sia_data_sub, sia_codes, by = c("activity.start.date" = "sia_date",
-                                                                   "place.admin.0" ="sia_country")) |>
+sia_data_sub <- dplyr::left_join(sia_data_sub, sia_codes, by = c("sia.code"="sia_code")) |>
                 dplyr::mutate(
                   sia_rd_viz = factor(sia_rd_viz, levels = c(
                     "round_0","first_sia", "second_sia",

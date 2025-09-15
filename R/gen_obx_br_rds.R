@@ -8,8 +8,8 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub, sia_sub2,sia_fun, df_
 
   base <- df_sub |>
     dplyr::ungroup() |>
-    dplyr::select(ob_id, ob_country, ob_srt_admin1, ipv_ctry, ob_srt_epid, ob_srt_onset, ob_srt_d0, first_reg_sia,first_reg_sia_end,
-                  sec_reg_sia,sec_reg_sia_end, most_recent, int_brk_vr, sia_date_upper)
+    dplyr::select(ob_id, ob_country, ob_srt_admin1, ipv_ctry, ob_srt_epid, ob_srt_onset, ob_srt_d0, first_reg_sia_code, first_reg_sia,first_reg_sia_end,
+                  sec_reg_sia_code, sec_reg_sia,sec_reg_sia_end, most_recent, int_brk_vr, sia_date_upper)
 
   # Local inputs to extract
   ob_start <- base |> tail(1) |> dplyr::pull(ob_srt_d0)
@@ -23,36 +23,36 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub, sia_sub2,sia_fun, df_
   sia1_start <- base |> tail(1) |> dplyr::pull(first_reg_sia)
   sia2_start <- base |> tail(1) |> dplyr::pull(sec_reg_sia)
 
+  sia1_code <- base |> tail(1) |> dplyr::pull(first_reg_sia_code)
+  sia2_code <- base |> tail(1) |> dplyr::pull(sec_reg_sia_code)
+
   base <- base |> dplyr::select(-sia_date_upper)
 
   # Was the initial SIA response covering the first region?
   # Pull ADM1 of regions covered
   # Check with SK tomorrow if we filter to all or ones with two
-  sia_info <- sia_sub |>
-    dplyr::filter(
-      place.admin.0 == ctry &
-        activity.start.date == sia1_start |
-        activity.start.date == sia2_start )
-
-  sia_prov_covered <-sia_info |>
-    dplyr::distinct(place.admin.1) |>
-    dplyr::pull(place.admin.1)
+  # sia_info <- sia_sub |>
+  #   dplyr::filter(
+  #     place.admin.0 == ctry &
+  #       activity.start.date == sia1_start |
+  #       activity.start.date == sia2_start )
+  #
+  # sia_prov_covered <-sia_info |>
+  #   dplyr::distinct(place.admin.1) |>
+  #   dplyr::pull(place.admin.1)
 
 
   # Pull in remaining SIAs
-  sia_count <- sia_sub |>
-    dplyr::filter(activity.start.date > sia2_start) |>
-    dplyr::distinct(sia.code, activity.start.date) |>
-    dplyr::arrange(activity.start.date)
+  sia_count <- sia_int |>
+    dplyr::filter(is.na(sia_rd_viz)==T)
 
 
 
 
   base <- base |>
-    dplyr::mutate(indx_ob_reg_cov = ifelse(ob_srt_admin1 %in% sia_prov_covered, "y", "n"),
-                  sia_rds_remain = nrow(sia_count))
+    dplyr::mutate(sia_rds_remain = nrow(sia_count))
 
-
+  # indx_ob_reg_cov = ifelse(ob_srt_admin1 %in% sia_prov_covered, "y", "n"),
 
   # Check with Steph here if it should be the end plus 28 or start plus 28 + 3
   all_ob_viruses <- positives.clean.01 |>
@@ -61,6 +61,22 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub, sia_sub2,sia_fun, df_
         measurement == sero &
         dateonset >= df_sub$fv_onset &
         dateonset <= df_sub$most_recent)
+
+  # Identify proviences covered
+
+  sia_info <- sia_sub |>
+    dplyr::filter(
+      place.admin.0 == ctry &
+        sia.code == sia1_code |
+        sia.code == sia2_code )
+
+  sia_prov_covered <-sia_info |>
+    dplyr::distinct(place.admin.1) |>
+    dplyr::pull(place.admin.1)
+
+
+
+
   # Next Virus
   all_ob_viruses <- all_ob_viruses |>
     dplyr::filter(!(place.admin.1 %in% sia_prov_covered &
@@ -117,7 +133,7 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub, sia_sub2,sia_fun, df_
               head(1) |>
               dplyr::pull(sia.code)
 
-     next_sia <- sia_sub |>
+     next_sia <- sia_fun |>
       dplyr::filter(sia.code ==  next_sia_code) |>
       dplyr::summarise(
         sia_name = dplyr::first(sia.code),
@@ -153,7 +169,7 @@ gen_obx_sia_br_rds <- function(positives.clean.01,sia_sub, sia_sub2,sia_fun, df_
 
 
     sia_count <- sia_count |>
-      dplyr::filter(!sia.code == next_sia_code)
+      dplyr::filter(!sia_code == next_sia_code)
 
 
     }else{ # select the next SIA ## Will need to fix code here once it shows up with no viruses
@@ -197,21 +213,21 @@ if(is.na(sia_complete)==F){
     # Create check if there were any SIAs done before the flagged SIA &
     # proceeding regions
 
-    if(any(sia_count$activity.start.date < sia1_start)){
+    if(any(sia_count$sia_date < sia1_start)){
       #Code needs to check each of the SIA and keep in any viruses that are covered by SIAS
       # before proceeding round - keep those viruses in
 
 
       sia_check <- sia_count |>
-         dplyr::filter(activity.start.date < sia1_start)
+         dplyr::filter(sia_date < sia1_start)
 
       # Insert Cli Alter here
 
       virus_check_list <- list()
 
       for (i in 1:nrow(sia_check)){
-        sd <- sia_check$activity.start.date[i]
-        id_name <- sia_check$sia.code[i]
+        sd <- sia_check$sia_date[i]
+        id_name <- sia_check$sia_code[i]
 
       #Filter to admins
       sia_checK_admins <- sia_fun |>
@@ -227,15 +243,14 @@ if(is.na(sia_complete)==F){
                         dateonset < sd &
                         place.admin.1 %in% sia_checK_admins &
                         report_date < sd)
-      # &report_date < sd
 
       if(nrow(virus_check)==0){
 
         sia_count <- sia_count |>
-      dplyr::filter(!(activity.start.date == sd &
-                      sia.code == id_name))
+      dplyr::filter(!(sia_date == sd &
+                      sia_code == id_name))
 
-      cli::cli_alert(paste0("SIA:", sia_check$sia.code[i], " removed - did not cover additional viruses"))
+      cli::cli_alert(paste0("SIA:", sia_check$sia_code[i], " removed - did not cover additional viruses"))
 
       }else{}
 
@@ -284,8 +299,8 @@ if(is.na(sia_complete)==F){
       dplyr::pull(place.admin.1)
 
     sia_count <- sia_count |>
-      dplyr::filter(!(activity.start.date == sia1_start &
-                      sia.code == sia1_name))
+      dplyr::filter(!(sia_date == sia1_start &
+                      sia_code == sia1_name))
 
   # Change here to include report date back in
 
@@ -325,8 +340,7 @@ if(is.na(sia_complete)==F){
         is.na(ipv_ctry) == F ~ "5_ipvctry",
         is.na(first_reg_sia_end) == T ~ "6_nosia"))|>
       dplyr::relocate(most_recent, .after = first_reg_sia_end) |>
-      dplyr::mutate(indx_ob_reg_cov = ifelse(ob_srt_admin1 %in% sia_prov_covered, "y", "n"),
-                    virus_remain = nrow(all_ob_viruses),
+      dplyr::mutate(virus_remain = nrow(all_ob_viruses),
                     sia_rds_remain = nrow(sia_count))
 
 
@@ -460,20 +474,22 @@ if(is.na(sia_complete)==F){
         # Create check if there were any SIAs done before the flagged SIA &
         # proceeding regions
 
-        if(any(sia_count$activity.start.date < sia1_start)){
+        if(any(sia_count$sia_date < sia1_start)){
           #Code needs to check each of the SIA and keep in any viruses that are covered by SIAS
           # before proceeding round - keep those viruses in
 
 
           sia_check <- sia_count |>
-            dplyr::filter(activity.start.date < sia1_start)
+            dplyr::filter(sia_date < sia1_start)
 
           # Insert Cli Alter here
 
           virus_check_list <- list()
 
           for (i in 1:nrow(sia_check)){
-            sd <- sia_check$activity.start.date[i]
+            sd <- sia_check$sia_date[i]
+            id_name <- sia_check$sia_code[i]
+
 
             #Filter to admins
             sia_checK_admins <- sia_fun |>
@@ -496,10 +512,10 @@ if(is.na(sia_complete)==F){
             if(nrow(virus_check)==0){
 
               sia_count <- sia_count |>
-                dplyr::filter(!(activity.start.date == sd &
-                                sia.code == id_name))
+                dplyr::filter(!(sia_date == sd &
+                                sia_code == id_name))
 
-              cli::cli_alert(paste0("SIA:", sia_check$sia.code[i], " removed - did not cover additional viruses"))
+              cli::cli_alert(paste0("SIA:", sia_check$sia_code[i], " removed - did not cover additional viruses"))
 
             }else{}
 
@@ -511,7 +527,7 @@ if(is.na(sia_complete)==F){
           virus_check_list <- virus_check_list|>
             dplyr::distinct(epid, .keep_all =T)
 
-          sia_info <- sia_sub |>
+          sia_info <- sia_fun |>
             dplyr::filter(
               place.admin.0 == ctry &
                 activity.start.date == sia1_start)
@@ -533,7 +549,7 @@ if(is.na(sia_complete)==F){
         }else{
           # If no viruses - cleares all by the first campaign
 
-          sia_info <- sia_sub |>
+          sia_info <- sia_fun |>
             dplyr::filter(
               place.admin.0 == ctry &
                 activity.start.date == sia1_start)
@@ -543,8 +559,8 @@ if(is.na(sia_complete)==F){
             dplyr::pull(place.admin.1)
 
           sia_count <- sia_count |>
-            dplyr::filter(!(activity.start.date == sia1_start &
-                              sia.code == sia1_name))
+            dplyr::filter(!(sia_date == sia1_start &
+                              sia_code == sia1_name))
 
 
           all_ob_viruses <- all_ob_viruses |>
@@ -562,6 +578,9 @@ if(is.na(sia_complete)==F){
                             report_date <= (next_virus$ob_srt_d0 + lubridate::years(1))))
         cli::cli_alert(paste0("No SIA found, removed all viruses in ADMIN 1 Region for next year"))
 
+        sia1_start <- next_virus |> tail(1) |> dplyr::pull(first_reg_sia)
+        sia1_end <- next_virus |> tail(1) |> dplyr::pull(first_reg_sia_end)
+        sia1_name <- next_virus |> tail(1) |> dplyr::pull(sia_name)
       }
 
       b1 <- base |> tail(1) |>
@@ -572,8 +591,8 @@ if(is.na(sia_complete)==F){
 
 
       sia_count <- sia_count |>
-        dplyr::filter(!(activity.start.date == sia1_start &
-                          sia.code == sia1_name))
+        dplyr::filter(!(sia_date == sia1_start &
+                          sia_code == sia1_name))
 
 
       if(is.na(sia_complete)==F){
@@ -591,7 +610,7 @@ if(is.na(sia_complete)==F){
           is.na(ipv_ctry) == F ~ "5_ipvctry",
           is.na(first_reg_sia_end) == T ~ "6_nosia"))|>
         dplyr::relocate(most_recent, .after = first_reg_sia_end) |>
-        dplyr::mutate(indx_ob_reg_cov = ifelse(ob_srt_admin1 %in% sia_prov_covered, "y", "n"),
+        dplyr::mutate(
                       virus_remain = nrow(all_ob_viruses),
                       sia_rds_remain = nrow(sia_count))
 
