@@ -1067,7 +1067,10 @@ bind_and_reconcile <- function(new_data, old_data) {
   old_data <- as.data.frame(old_data)
 
   for (name in old_names) {
-    class(new_data[, name]) <- classes_old[name][[1]]
+    # Check if old columns exist in the new data
+    if (name %in% names(new_data)) {
+      class(new_data[, name]) <- classes_old[name][[1]]
+    }
   }
 
   new_data <- dplyr::as_tibble(new_data)
@@ -1797,25 +1800,33 @@ log_report <- function(log_file = Sys.getenv("POLIS_LOG_FILE"),
 
 
   # csv files to attach to report
-  changed.virus.type <- tidypolis_io(io = "read", file_path = paste0(polis_data_folder, "/Core_Ready_Files/Changed_virustype_virusTableData.csv"))
-  change.virus.class <- tidypolis_io(io = "read", file_path = paste0(polis_data_folder, "/Core_Ready_Files/virus_class_changed_date.csv"))
-  new.virus.records <- tidypolis_io(io = "read", file_path = paste0(polis_data_folder, "/Core_Ready_Files/in_new_not_old_virusTableData.csv"))
-
-  readr::write_csv(x = changed.virus.type, file = file.path(tempdir(), "changed_virus_type.csv"))
-  readr::write_csv(x = change.virus.class, file = file.path(tempdir(), "changed_virus_class.csv"))
-  readr::write_csv(x = new.virus.records, file = file.path(tempdir(), "new_virus_records.csv"))
+  if (tidypolis_io(io = "exists.file", file_path = paste0(polis_data_folder, "/Core_Ready_Files/Changed_virustype_virusTableData.csv"))) {
+    changed.virus.type <- tidypolis_io(io = "read", file_path = paste0(polis_data_folder, "/Core_Ready_Files/Changed_virustype_virusTableData.csv"))
+    readr::write_csv(x = changed.virus.type, file = file.path(tempdir(), "changed_virus_type.csv"))
+  }
+  if (tidypolis_io(io = "exists.file", file_path = paste0(polis_data_folder, "/Core_Ready_Files/virus_class_changed_date.csv"))) {
+    change.virus.class <- tidypolis_io(io = "read", file_path = paste0(polis_data_folder, "/Core_Ready_Files/virus_class_changed_date.csv"))
+    readr::write_csv(x = change.virus.class, file = file.path(tempdir(), "changed_virus_class.csv"))
+  }
+  if (tidypolis_io(io = "exists.file", file_path = paste0(polis_data_folder, "/Core_Ready_Files/in_new_not_old_virusTableData.csv"))) {
+    new.virus.records <- tidypolis_io(io = "read", file_path = paste0(polis_data_folder, "/Core_Ready_Files/in_new_not_old_virusTableData.csv"))
+    readr::write_csv(x = new.virus.records, file = file.path(tempdir(), "new_virus_records.csv"))
+  }
 
   # coms section
   sirfunctions::send_teams_message(msg = paste0("New CORE data files info: ", report_info))
   sirfunctions::send_teams_message(msg = paste0("New CORE data files alerts: ", report_alert))
-  sirfunctions::send_teams_message(
-    msg = "Attached CSVs contain information on new/changed virus records",
     attach = c(
       file.path(tempdir(), "changed_virus_type.csv"),
       file.path(tempdir(), "changed_virus_class.csv"),
       file.path(tempdir(), "new_virus_records.csv")
-    )
-  )
+      )
+    if (length(attach[file.exists(attach)]) > 0) {
+      sirfunctions::send_teams_message(
+        msg = "Attached CSVs contain information on new/changed virus records",
+        attach = attach[file.exists(attach)]
+        )
+    }
 }
 
 
