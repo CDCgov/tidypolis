@@ -13,7 +13,8 @@
 #' }
 #' @export
 get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
-                           .table) {
+                           .table,
+                           output_format = "rds") {
   base_url <- "https://extranet.who.int/polis/api/v2/"
   table_data <- get_polis_cache(.table = .table)
   table_url <- paste0(base_url, table_data$endpoint)
@@ -157,7 +158,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
       Sys.getenv("POLIS_DATA_CACHE"),
       "/",
       table_data$table,
-      ".rds"
+      ".",
+      output_format
     ))
     update_polis_log(
       .event = paste0(table_data$table, " data saved locally"),
@@ -261,7 +263,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
             Sys.getenv("POLIS_DATA_CACHE"),
             "/",
             table_data$table,
-            ".rds"
+            ".",
+            output_format
           ))
         cli::cli_process_done()
         old_cache_n <- nrow(old_cache)
@@ -402,7 +405,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
             Sys.getenv("POLIS_DATA_CACHE"),
             "/",
             table_data$table,
-            ".rds"
+            ".",
+            output_format
           ))
           update_polis_log(
             .event = paste0(table_data$table, " data saved locally"),
@@ -432,7 +436,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
               Sys.getenv("POLIS_DATA_CACHE"),
               "/",
               table_data$table,
-              ".rds"
+              ".",
+              output_format
             )
           )
           update_polis_log(
@@ -698,8 +703,17 @@ call_single_url <- function(url,
   )
 
   out <- jsonlite::fromJSON(rawToChar(response$content))
+  data <- dplyr::as_tibble(out$value)
 
-  dplyr::as_tibble(out$value)
+  # Prevent columns from becoming logical
+  data <- dplyr::mutate(data, dplyr::across(dplyr::everything(), as.character))
+  non_na_data <- dplyr::filter(data, dplyr::if_all(dplyr::everything(), ~!is.na(.x)))
+
+  if (nrow(non_na_data) > 0) {
+    utils::type.convert(data, as.is = TRUE)
+  } else {
+    data
+  }
 
   # Sys.sleep(1.25)
 }
@@ -1140,7 +1154,7 @@ remove_empty_columns <- function(dataframe) {
   }
   return(
     original_df |>
-      dplyr::select(-empty_cols)
+      dplyr::select(-dplyr::any_of(empty_cols))
   )
 }
 
