@@ -41,7 +41,9 @@ Suggests:
     AzureStor,
     testthat (>= 3.0.0),
     knitr,
-    rmarkdown
+    rmarkdown,
+    mockery,
+    withr
 Remotes:
     nish-kishore/sirfunctions@017bc64
 Config/testthat/edition: 3
