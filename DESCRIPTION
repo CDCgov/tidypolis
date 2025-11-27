@@ -11,7 +11,7 @@ Description: This package uses the POLIS API to ease download and processing of 
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Imports:
     cluster,
     doFuture,
