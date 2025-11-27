@@ -25,9 +25,20 @@ call_single_url <- function(url,
   out <- jsonlite::fromJSON(rawToChar(response$content))
   data <- dplyr::as_tibble(out$value)
 
-  # Prevent columns from becoming logical
+  # Convert string representations of NULL/NA to actual NA values
   data <- data |>
-    dplyr::mutate(dplyr::across(dplyr::everything(), as.character))
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::everything(),
+        ~ dplyr::case_when(
+          as.character(.x) %in% c("NULL", "NA", "") ~ NA_character_,
+          TRUE ~ as.character(.x)
+        )
+      )
+    )
+
+  # Infer and apply column types (works with sparse data)
+  data <- readr::type_convert(data, col_types = readr::cols())
 
   return(data)
   # Sys.sleep(1.25)

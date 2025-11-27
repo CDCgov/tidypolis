@@ -656,7 +656,20 @@ call_urls <- function(urls) {
     dplyr::pull(response) |>
     dplyr::bind_rows()
 
-  resp <- readr::type_convert(resp)
+  # Convert string representations of NULL/NA to actual NA values
+  resp <- resp |>
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::everything(),
+        ~ dplyr::case_when(
+          as.character(.x) %in% c("NULL", "NA", "") ~ NA_character_,
+          TRUE ~ as.character(.x)
+        )
+      )
+    )
+
+  # Infer and apply column types (works with sparse data)
+  resp <- readr::type_convert(resp, col_types = readr::cols())
 
   log <- dplyr::bind_rows(y) |>
     dplyr::pull(log) |>
