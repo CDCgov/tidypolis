@@ -5,6 +5,7 @@
 #' @description Get POLIS table Data
 #' @param api_key API Key
 #' @param .table Table value to retrieve
+#' @param output_format `str` Output format of the file.
 #' @returns Tibble with reference data
 #' @examples
 #' \dontrun{
@@ -13,7 +14,8 @@
 #' }
 #' @export
 get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
-                           .table) {
+                           .table,
+                           output_format = "rds") {
   base_url <- "https://extranet.who.int/polis/api/v2/"
   table_data <- get_polis_cache(.table = .table)
   table_url <- paste0(base_url, table_data$endpoint)
@@ -157,7 +159,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
       Sys.getenv("POLIS_DATA_CACHE"),
       "/",
       table_data$table,
-      ".rds"
+      ".",
+      output_format
     ))
     update_polis_log(
       .event = paste0(table_data$table, " data saved locally"),
@@ -261,7 +264,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
             Sys.getenv("POLIS_DATA_CACHE"),
             "/",
             table_data$table,
-            ".rds"
+            ".",
+            output_format
           ))
         cli::cli_process_done()
         old_cache_n <- nrow(old_cache)
@@ -402,7 +406,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
             Sys.getenv("POLIS_DATA_CACHE"),
             "/",
             table_data$table,
-            ".rds"
+            ".",
+            output_format
           ))
           update_polis_log(
             .event = paste0(table_data$table, " data saved locally"),
@@ -432,7 +437,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
               Sys.getenv("POLIS_DATA_CACHE"),
               "/",
               table_data$table,
-              ".rds"
+              ".",
+              output_format
             )
           )
           update_polis_log(

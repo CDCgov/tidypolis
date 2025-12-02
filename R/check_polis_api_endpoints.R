@@ -7,7 +7,7 @@ check_polis_api_endpoints <- function(.table = NULL) {
   api_key <- Sys.getenv("POLIS_API_KEY")
 
   # Filter Cache and Extract Tables
-  cache_data <- tidypolis:::tidypolis_io(io = "read", file_path = Sys.getenv("POLIS_CACHE_FILE")) |>
+  cache_data <- tidypolis_io(io = "read", file_path = Sys.getenv("POLIS_CACHE_FILE")) |>
     dplyr::filter(!is.na(polis_id), !is.na(endpoint), !is.na(table)) |>
     dplyr::mutate(max_download_size = ifelse(table %in% c("virus", "case"), 2000L, 1000L))
 
