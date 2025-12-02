@@ -703,17 +703,8 @@ call_single_url <- function(url,
   )
 
   out <- jsonlite::fromJSON(rawToChar(response$content))
-  data <- dplyr::as_tibble(out$value)
 
-  # Prevent columns from becoming logical
-  data <- dplyr::mutate(data, dplyr::across(dplyr::everything(), as.character))
-  non_na_data <- dplyr::filter(data, dplyr::if_all(dplyr::everything(), ~!is.na(.x)))
-
-  if (nrow(non_na_data) > 0) {
-    utils::type.convert(data, as.is = TRUE)
-  } else {
-    data
-  }
+  dplyr::as_tibble(out$value)
 
   # Sys.sleep(1.25)
 }
