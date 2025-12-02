@@ -15,10 +15,10 @@
 #'
 #' @examples
 #' \dontrun{
-#' check_new_viruses()
+#' data_errors <- check_new_viruses()
 #' }
-check_new_viruses <- function(virus_table_path =  "GID/PEB/SIR/POLIS/data/virus.rds",
-                              week_floor_date = lubridate::floor_date(Sys.Date(), unit = "week", week_start = 1),
+check_new_viruses <- function(week_floor_date = lubridate::floor_date(Sys.Date(), unit = "week", week_start = 1),
+                              virus_table_path =  "GID/PEB/SIR/POLIS/data/virus.rds",
                               edav = TRUE) {
   cli::cli_process_start("Loading positives dataset from POLIS API")
   positives <- sirfunctions::sirfunctions_io("read", NULL, file_loc = virus_table_path, edav = edav)
@@ -111,6 +111,7 @@ check_new_viruses <- function(virus_table_path =  "GID/PEB/SIR/POLIS/data/virus.
   error_list <- list()
   error_list$newly_added <- newly_added
   error_list$newly_changed_classification <- newly_changed_classification
+  cli::cli_alert_info("NOTE: Viruses in newly_reported are those with report dates only.")
   error_list$newly_reported <- newly_reported
   error_list$new_no_hq_date <- new_no_hq_date
   error_list$new_no_vdpv_change_date <- new_no_vdpv_change_date

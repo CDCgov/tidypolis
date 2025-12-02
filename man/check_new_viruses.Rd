@@ -27,6 +27,6 @@ week.
 }
 \examples{
 \dontrun{
-check_new_viruses()
+data_errors <- check_new_viruses()
 }
 }
