@@ -5,6 +5,7 @@
 #' @description Get POLIS table Data
 #' @param api_key API Key
 #' @param .table Table value to retrieve
+#' @param output_format `str` Output format of the file.
 #' @returns Tibble with reference data
 #' @examples
 #' \dontrun{
