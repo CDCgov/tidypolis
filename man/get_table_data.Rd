@@ -4,12 +4,18 @@
 \alias{get_table_data}
 \title{Request data from single table}
 \usage{
-get_table_data(api_key = Sys.getenv("POLIS_API_Key"), .table)
+get_table_data(
+  api_key = Sys.getenv("POLIS_API_Key"),
+  .table,
+  output_format = "rds"
+)
 }
 \arguments{
 \item{api_key}{API Key}
 
 \item{.table}{Table value to retrieve}
+
+\item{output_format}{\code{str} Output format of the file.}
 }
 \value{
 Tibble with reference data
