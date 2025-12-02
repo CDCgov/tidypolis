@@ -20,6 +20,7 @@
 check_new_viruses <- function(week_floor_date = lubridate::floor_date(Sys.Date(), unit = "week", week_start = 1),
                               virus_table_path =  "GID/PEB/SIR/POLIS/data/virus.rds",
                               edav = TRUE) {
+  week_floor_date <- lubridate::as_date(week_floor_date)
   cli::cli_process_start("Loading positives dataset from POLIS API")
   positives <- sirfunctions::sirfunctions_io("read", NULL, file_loc = virus_table_path, edav = edav)
   cli::cli_process_done()
