@@ -1,10 +1,10 @@
 #' Call single URL
-#' @description Call a return the formatted output frome one URL
-#' @param url `str` single url
-#' @param api_key `str` validated API key
-#' @param times `int` number of times to attempt connection with API
+#' @description Call a return the formatted output frome one URL.
+#' @param url `str` Single url.
+#' @param api_key `str` validated API key.
+#' @param times `int` Number of times to attempt connection with API.
 #' @export
-#' @returns tibble
+#' @returns `tibble` Dataset requested from the API.
 call_single_url <- function(url,
                             api_key = Sys.getenv("POLIS_API_KEY"),
                             times = 10) {
