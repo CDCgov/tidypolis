@@ -1123,7 +1123,7 @@ remove_empty_columns <- function(dataframe) {
   }
   return(
     original_df |>
-      dplyr::select(-empty_cols)
+      dplyr::select(-dplyr::any_of(empty_cols))
   )
 }
 
