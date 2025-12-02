@@ -3,6 +3,7 @@
 export(archive_log)
 export(call_single_url)
 export(call_urls)
+export(check_new_viruses)
 export(check_polis_api_endpoints)
 export(crosswalk_frontend_case_table)
 export(freeze_polis_data)
