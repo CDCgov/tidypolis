@@ -36,7 +36,7 @@ check_new_viruses <- function(virus_table =  "GID/PEB/SIR/POLIS/data/virus.rds",
     cli::cli_process_start("Loading positives dataset based on path provided")
     positives <- sirfunctions::sirfunctions_io("read", NULL, file_loc = virus_table_path, edav = edav)
     positives <- format_api_virus_table(positives)
-    table_type <- "raw virus table"
+  table_type <- "raw virus table"
     cli::cli_process_done()
   } else if (dplyr::is.tbl(virus_table)) {
     if ("EPID" %in% names(virus_table)) {
@@ -56,7 +56,7 @@ check_new_viruses <- function(virus_table =  "GID/PEB/SIR/POLIS/data/virus.rds",
 
   # Viruses
   if (table_type == "raw virus table") {
-    newly_added <- filter_current_week(positives, "createddate", week_floor_date)
+    newly_added <- filter_current_week(positives, "publishdate", week_floor_date)
     newly_updated <- filter_current_week(positives, "updateddate", week_floor_date)
   } else {
     cli::cli_alert_info("At this time, the preprocessed positives dataset does not contain the created and updated date")
@@ -86,7 +86,9 @@ check_new_viruses <- function(virus_table =  "GID/PEB/SIR/POLIS/data/virus.rds",
   cli::cli_process_done()
 
   # Weekly reporting error
+  error_list <- list()
   if (table_type == "raw virus table") {
+    current_week <- names(which.max(table(newly_reported$virusreportingweekandyear)))
     if (is.null(current_week)) {
       cli::cli_alert_warning("No new viruses for the week selected")
     } else {
@@ -94,6 +96,7 @@ check_new_viruses <- function(virus_table =  "GID/PEB/SIR/POLIS/data/virus.rds",
     }
     new_but_different_week <- newly_added |>
       dplyr::filter(virusreportingweekandyear != current_week)
+    error_list$new_but_different_week <- new_but_different_week
     cli::cli_li(paste0("Newly added viruses reported for a different week: ", nrow(new_but_different_week)))
   }
 
@@ -104,8 +107,8 @@ check_new_viruses <- function(virus_table =  "GID/PEB/SIR/POLIS/data/virus.rds",
 
   cli::cli_alert_info("Please check the outputted list for more details on the issues highlighted")
 
-  error_list <- list()
   error_list$newly_added <- newly_added
+  error_list$newly_updated <- newly_updated
   error_list$newly_changed_classification <- newly_changed_classification
   cli::cli_alert_info("NOTE: Viruses in newly_reported are those with report dates only.")
   error_list$newly_reported <- newly_reported
