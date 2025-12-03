@@ -15,7 +15,7 @@
 #' there are instances where it is not possible to patch. FOr example, if an AFP VDPV detection in the virus
 #' table is also missing its VDPV classification date in the AFP linelist.
 #'
-#' @param virus_table `str` Absolute path to the virus table, the direct virus dataset from the API pull,
+#' @param virus_table `str` or `tibble` Absolute path to the virus table, the direct virus dataset from the API pull,
 #' or the positives dataset after being cleaned during preprocessing.
 #' @param week_floor_date `date` Start date of the week to analyze. Defaults to the Monday of the previous week.
 #' @param edav `logical` Whether to load the positives file from EDAV or locally. Defaults to TRUE.

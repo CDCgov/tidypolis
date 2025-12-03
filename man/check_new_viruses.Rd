@@ -5,13 +5,14 @@
 \title{Analyze errors in the Positives dataset pulled directly from the POLIS API}
 \usage{
 check_new_viruses(
-  virus_table_path = "GID/PEB/SIR/POLIS/data/virus.rds",
+  virus_table = "GID/PEB/SIR/POLIS/data/virus.rds",
   week_floor_date = lubridate::floor_date(Sys.Date(), unit = "week", week_start = 1),
   edav = TRUE
 )
 }
 \arguments{
-\item{virus_table_path}{\code{str} Absolute path to the positives file.}
+\item{virus_table}{\code{str} or \code{tibble} Absolute path to the virus table, the direct virus dataset from the API pull,
+or the positives dataset after being cleaned during preprocessing.}
 
 \item{week_floor_date}{\code{date} Start date of the week to analyze. Defaults to the Monday of the previous week.}
 
@@ -24,6 +25,16 @@ check_new_viruses(
 Checks for errors in the virus table downloaded from the POLIS API. It is meant
 to catch errors related to inconsistencies in detections reported in the current
 week.
+}
+\details{
+NOTE: this function analyzes the virus table from the direct API pull or the positives file
+after completing preprocessing. The virus table has missingness in its notification to HQ date
+or the VDPV classification date, which is "patched" during preprocessing.
+The patch involves pulling these fields directly from the AFP linelist or the ES table,
+depending on whether the virus in question is an ES
+sample or not, as these tables have more complete information on those two date fields. However,
+there are instances where it is not possible to patch. FOr example, if an AFP VDPV detection in the virus
+table is also missing its VDPV classification date in the AFP linelist.
 }
 \examples{
 \dontrun{
