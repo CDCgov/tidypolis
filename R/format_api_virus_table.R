@@ -14,12 +14,18 @@ format_api_virus_table <- function(api_virus_table) {
   relevant_cols <- c("EPID", "VirusDate", "VirusReportingWeekAndYear", "VirusTypeName",
                      "CreatedDate", "UpdatedDate", "PublishDate",
                      "VdpvReportedToHQDate", "VdpvClassificationChangeDate",
-                     "Admin0Name", "Admin1Name")
+                     "Admin0Name", "Admin1Name",
+
+                     "Virus Date", "Place Admin 0", "Place Admin 1" # these are from CORE READY virus files
+                     )
 
   df <- api_virus_table |>
     dplyr::select(dplyr::any_of(relevant_cols)) |>
     dplyr::rename_with(stringr::str_to_lower) |>
     dplyr::rename_with(recode,
+                       `virus date` = "dateonset",
+                       `place admin 0` = "place.admin.0",
+                       `place admin 1` = "place.admin.1",
                        virusdate = "dateonset",
                        virustypename = "measurement",
                        admin0name = "place.admin.0",
@@ -33,8 +39,8 @@ format_api_virus_table <- function(api_virus_table) {
   if (all(c("measurement", "vdpvclassificationchangedate", "datenotificationtohq") %in% names(df))) {
     df <- df |>
       dplyr::mutate(report_date = dplyr::case_when(
-        measurement %in% c("cVDPV1", "cVDPV2", "cVDPV3", "VDPV1", "VDPV2", "VDPV3") ~ vdpvclassificationchangedate,
-        measurement == "WILD1" ~ datenotificationtohq
+        stringr::str_detect(measurement, "VDPV") ~ vdpvclassificationchangedate,
+        stringr::str_detect(measurement, "WILD") ~ datenotificationtohq
       ))
   } else {
     df$report_date <- NA_Date_

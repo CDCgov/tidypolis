@@ -15,7 +15,7 @@ filter_current_week <- function(tibble, date_col, week_floor_date) {
   current_week_end <- week_floor_date + days(1)
 
   tibble |>
-    dplyr::filter(measurement %in% c("cVDPV 1", "cVDPV 2", "cVDPV 3", "VDPV 1", "VDPV 2", "VDPV 3", "WILD 1"),
+    dplyr::filter(stringr::str_detect(measurement, "VDPV|WILD"),
                   !!dplyr::sym(date_col) <= current_week_end &
                     (!!dplyr::sym(date_col) >= current_week_start |
                        (!!dplyr::sym(date_col) >= current_week_start_endemics &
