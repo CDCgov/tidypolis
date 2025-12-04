@@ -1487,8 +1487,6 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
               dplyr::filter(GUID == guid) |>
               dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME)
 
-            if (nrow (ctry_prov_dist_name) == 0) {next}
-
             cli::cli_alert_warning(paste0(
               "Fixing errors for:\n",
               "Country: ", ctry_prov_dist_name$ADM0_NAME, "\n",
