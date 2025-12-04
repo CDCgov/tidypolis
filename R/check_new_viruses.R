@@ -34,7 +34,7 @@ check_new_viruses <- function(virus_table =  "GID/PEB/SIR/POLIS/data/virus.rds",
 
   if (is.character(virus_table)) {
     cli::cli_process_start("Loading positives dataset based on path provided")
-    positives <- sirfunctions::sirfunctions_io("read", NULL, file_loc = virus_table_path, edav = edav)
+    positives <- sirfunctions::sirfunctions_io("read", NULL, file_loc = virus_table, edav = edav)
     positives <- format_api_virus_table(positives)
     table_type <- "raw virus table"
     cli::cli_process_done()
