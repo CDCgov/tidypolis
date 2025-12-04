@@ -1467,86 +1467,95 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
       dplyr::filter(GUID %in% empty.coord.01$Admin2GUID) |>
       dplyr::left_join(empty.coord.01, by = c("GUID" = "Admin2GUID"))
 
-    cli::cli_process_start("Placing random points for cases with bad coordinates")
-    pt01 <- lapply(1:nrow(empty.coord.02), function(x) {
-      tryCatch(
-        expr = {
-          suppressMessages(sf::st_sample(empty.coord.02[x, ],
-            dplyr::pull(empty.coord.02[x, ], "nperarm"),
-            exact = T
-          )) |> sf::st_as_sf()
-        },
-        error = function(e) {
-          guid <- empty.coord.02[x, ]$GUID[1]
-          ctry_prov_dist_name <- global.dist.01 |>
-            dplyr::filter(GUID == guid) |>
-            dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME)
-          cli::cli_alert_warning(paste0(
-            "Fixing errors for:\n",
-            "Country: ", ctry_prov_dist_name$ADM0_NAME, "\n",
-            "Province: ", ctry_prov_dist_name$ADM1_NAME, "\n",
-            "District: ", ctry_prov_dist_name$ADM2_NAME
-          ))
+    if (nrow(empty.coord.02) == 0) {
+      cli::cli_alert_info("All cases with missing coordinates have GUIDs that do not exist in the spatial dataset.")
+      df08 <- df07
+    } else {
+      cli::cli_process_start("Placing random points for cases with bad coordinates")
 
-          suppressWarnings({
-            sf::sf_use_s2(F)
-            int <- empty.coord.02[x, ] |> sf::st_centroid(of_largest_polygon = T)
-            sf::sf_use_s2(T)
+      pt01 <- lapply(1:nrow(empty.coord.02), function(x) {
+        tryCatch(
+          expr = {
+            suppressMessages(sf::st_sample(empty.coord.02[x, ],
+                                           dplyr::pull(empty.coord.02[x, ], "nperarm"),
+                                           exact = T
+            )) |> sf::st_as_sf()
+          },
+          error = function(e) {
+            guid <- empty.coord.02[x, ]$GUID[1]
+            ctry_prov_dist_name <- global.dist.01 |>
+              dplyr::filter(GUID == guid) |>
+              dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME)
 
-            sf::st_buffer(int, dist = 3000) |>
-              sf::st_sample(dplyr::slice(empty.coord.02, x) |>
-                dplyr::pull(nperarm)) |>
-              sf::st_as_sf()
-          })
-        }
-      )
-    }) |>
-      dplyr::bind_rows()
+            if (nrow (ctry_prov_dist_name) == 0) {next}
 
-    cli::cli_process_done()
+            cli::cli_alert_warning(paste0(
+              "Fixing errors for:\n",
+              "Country: ", ctry_prov_dist_name$ADM0_NAME, "\n",
+              "Province: ", ctry_prov_dist_name$ADM1_NAME, "\n",
+              "District: ", ctry_prov_dist_name$ADM2_NAME
+            ))
 
-    pt01_joined <- dplyr::bind_cols(
-      pt01,
-      empty.coord.02 |>
-        dplyr::as_tibble() |>
-        dplyr::select(GUID, nperarm) |>
-        tidyr::uncount(nperarm)
-    ) |>
-      dplyr::left_join(
-        dplyr::as_tibble(empty.coord.02) |>
-          dplyr::select(-Shape),
-        by = "GUID"
-      )
+            suppressWarnings({
+              sf::sf_use_s2(F)
+              int <- empty.coord.02[x, ] |> sf::st_centroid(of_largest_polygon = T)
+              sf::sf_use_s2(T)
 
-    pt02 <- pt01_joined |>
-      dplyr::as_tibble() |>
-      dplyr::select(-nperarm, -id) |>
-      dplyr::group_by(GUID) |>
-      dplyr::arrange(GUID, .by_group = TRUE) |>
-      dplyr::mutate(id = dplyr::row_number()) |>
-      as.data.frame()
+              sf::st_buffer(int, dist = 3000) |>
+                sf::st_sample(dplyr::slice(empty.coord.02, x) |>
+                                dplyr::pull(nperarm)) |>
+                sf::st_as_sf()
+            })
+          }
+        )
+      }) |>
+        dplyr::bind_rows()
 
-    pt03 <- empty.coord |>
-      dplyr::group_by(Admin2GUID) |>
-      dplyr::arrange(Admin2GUID, .by_group = TRUE) |>
-      dplyr::mutate(id = dplyr::row_number()) |>
-      dplyr::ungroup()
+      cli::cli_process_done()
 
-    pt04 <- dplyr::full_join(pt03, pt02, by = c("Admin2GUID" = "GUID", "id"))
-
-    pt05 <- pt04 |>
-      dplyr::bind_cols(
-        dplyr::as_tibble(pt04$x),
-        sf::st_coordinates(pt04$x) |>
+      pt01_joined <- dplyr::bind_cols(
+        pt01,
+        empty.coord.02 |>
           dplyr::as_tibble() |>
-          dplyr::rename("lon" = "X", "lat" = "Y")
+          dplyr::select(GUID, nperarm) |>
+          tidyr::uncount(nperarm)
       ) |>
-      dplyr::select(-id)
+        dplyr::left_join(
+          dplyr::as_tibble(empty.coord.02) |>
+            dplyr::select(-Shape),
+          by = "GUID"
+        )
 
-    pt05$x <- NULL
-    pt05$geometry <- NULL
+      pt02 <- pt01_joined |>
+        dplyr::as_tibble() |>
+        dplyr::select(-nperarm, -id) |>
+        dplyr::group_by(GUID) |>
+        dplyr::arrange(GUID, .by_group = TRUE) |>
+        dplyr::mutate(id = dplyr::row_number()) |>
+        as.data.frame()
 
-    df08 <- dplyr::bind_rows(df07, pt05)
+      pt03 <- empty.coord |>
+        dplyr::group_by(Admin2GUID) |>
+        dplyr::arrange(Admin2GUID, .by_group = TRUE) |>
+        dplyr::mutate(id = dplyr::row_number()) |>
+        dplyr::ungroup()
+
+      pt04 <- dplyr::full_join(pt03, pt02, by = c("Admin2GUID" = "GUID", "id"))
+
+      pt05 <- pt04 |>
+        dplyr::bind_cols(
+          dplyr::as_tibble(pt04$x),
+          sf::st_coordinates(pt04$x) |>
+            dplyr::as_tibble() |>
+            dplyr::rename("lon" = "X", "lat" = "Y")
+        ) |>
+        dplyr::select(-id)
+
+      pt05$x <- NULL
+      pt05$geometry <- NULL
+
+      df08 <- dplyr::bind_rows(df07, pt05)
+    }
   } else {
     df08 <- df07
   }
