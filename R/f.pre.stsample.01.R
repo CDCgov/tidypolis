@@ -275,10 +275,10 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
       place.admin.1 = ifelse((place.admin.1 != ADM1_NAME | is.na(place.admin.1)) & !is.na(ADM1_NAME), ADM1_NAME, place.admin.1),
       place.admin.2 = ifelse((place.admin.2 != ADM2_NAME | is.na(place.admin.2)) & !is.na(ADM2_NAME), ADM2_NAME, place.admin.2)
     ) |>
-    dplyr::select(-c(
+    dplyr::select(-any_of(c(
       "wrongAdmin0GUID", "wrongAdmin1GUID", "wrongAdmin2GUID", "ADM1_GUID", "ADM0_GUID", "ADM0_NAME",
       "ADM1_NAME", "ADM2_NAME"
-    )) |>
+    ))) |>
     dplyr::mutate(geo.corrected = ifelse(is.na(geo.corrected), 0, geo.corrected))
 
   df09$Shape <- NULL
