@@ -1201,7 +1201,7 @@ f.download.compare.01 <- function(old.download, new.download) {
     dplyr::mutate_all(~ stringr::str_trim(., side = "both")) |>
     dplyr::mutate_all(~ dplyr::na_if(., "")) |>
     # below would strip data by column find distinct values by column
-    # then rbind. So variables become rows. Makes it easier to read
+    # then bind_rows. So variables become rows. Makes it easier to read
     purrr::map_df(~ (data.frame(combine.distinct.01 = dplyr::n_distinct(.x))),
       .id = "variable"
     )
@@ -1864,7 +1864,7 @@ archive_log <- function(log_file = Sys.getenv("POLIS_LOG_FILE"),
   log.current <- log |>
     dplyr::filter(time > log.time.to.arch)
 
-  # check existence of archived log and either create or rbind to it
+  # check existence of archived log and either create or bind_rows to it
   flag.log.exists <- tidypolis_io(
     io = "exists.file",
     file_path = file.path(polis_data_folder, "Log_Archive/log_archive.rds")
@@ -2014,7 +2014,7 @@ create_response_vars <- function(pos,
     ) |>
     unique()
 
-  finished.responses <- rbind(type1, type2, type3) |>
+  finished.responses <- dplyr::bind_rows(type1, type2, type3) |>
     dplyr::group_by(epid, ntchanges, emergencegroup) |>
     dplyr::mutate(finished.responses = n()) |>
     dplyr::ungroup() |>
@@ -3104,7 +3104,7 @@ process_spatial <- function(gdb_folder,
     df.list[[i]] <- df02
   }
 
-  long.global.prov.01 <- do.call(rbind, df.list)
+  long.global.prov.01 <- dplyr::bind_rows(df.list)
   cli::cli_process_start("Evaluating overlapping province shapes")
 
   if (endyr == lubridate::year(format(Sys.time())) & startyr == 2000) {
@@ -3154,7 +3154,7 @@ process_spatial <- function(gdb_folder,
     df.list[[i]] <- df02
   }
 
-  long.global.dist.01 <- do.call(rbind, df.list)
+  long.global.dist.01 <- dplyr::bind_rows(df.list)
 
   cli::cli_process_start("Evaluating overlapping district shapes")
 
@@ -3446,7 +3446,7 @@ add_gpei_cases <- function(azcontainer = suppressMessages(get_azure_storage_conn
   }
 
   if (exists("proxy.data.prov.final") & exists("proxy.data.ctry.final")) {
-    proxy.data.final <- rbind(proxy.data.prov.final, proxy.data.ctry.final) |>
+    proxy.data.final <- dplyr::bind_rows(proxy.data.prov.final, proxy.data.ctry.final) |>
       dplyr::mutate(
         dateonset = as.Date(dateonset, format = "%m/%d/%Y"),
         report_date = as.Date(report_date, format = "%m/%d/%Y"),
@@ -6001,7 +6001,7 @@ s2_process_coordinates <- function(data, polis_data_folder, polis_folder,
     data_deduped <- dup_epid_fixed |>
       dplyr::select(-c("epid", "dup_epid")) |>
       dplyr::rename(epid = epid_fixed) |>
-      rbind(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
+      dplyr::bind_rows(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
 
 
     cli::cli_alert_warning(paste0(
@@ -9082,7 +9082,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
 
 
   # Combine AFP and other surveillance type cases
-  afp.02 <- rbind(afp.01, non.afp.01) |>
+  afp.02 <- dplyr::bind_rows(afp.01, non.afp.01) |>
     dplyr::select(epid, lat, lon, datenotificationtohq) |>
     dplyr::mutate(datenotificationtohq = parse_date_time(datenotificationtohq, c("%Y-%m-%d", "%d/%m/%Y")))
 
