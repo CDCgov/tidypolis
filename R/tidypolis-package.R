@@ -105,5 +105,5 @@ utils::globalVariables(c(
   "no.of.shapes", "report_date", "DosesOPVNumber", "geo.corrected", "wrongAdmin0GUID",
   "Admin 0 Id", "Admin 1 Id", "Admin 2 Id", "WHO Region", "WHORegion", "X",
   "cluster", "datasource", "epid_fixed", "file_name", "value", "old", "new",
-  "y", "polis_id", "endpoint"
+  "y", "polis_id", "endpoint", " virusreportingweekandyear"
 ))
