@@ -3088,7 +3088,7 @@ process_spatial <- function(gdb_folder,
   df.list <- list()
 
   for (i in startyr:endyr) {
-    df02 <- sirfunctions:::f.yrs.01(global.prov.01, i)
+    df02 <- f.yrs.01(global.prov.01, i)
 
     df.list[[i]] <- df02
   }
@@ -3138,7 +3138,7 @@ process_spatial <- function(gdb_folder,
   df.list <- list()
 
   for (i in startyr:endyr) {
-    df02 <- sirfunctions:::f.yrs.01(global.dist.01, i)
+    df02 <- f.yrs.01(global.dist.01, i)
 
     df.list[[i]] <- df02
   }

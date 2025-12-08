@@ -3,7 +3,7 @@ library(testthat)
 library(dplyr)
 library(lubridate)
 library(stringr)
-library(tibble)
+library(dplyr)
 
 test_that("format_api_virus_table selects and renames columns correctly", {
   input <- tibble(

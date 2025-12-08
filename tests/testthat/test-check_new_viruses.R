@@ -2,7 +2,6 @@
 library(testthat)
 library(dplyr)
 library(lubridate)
-library(tibble)
 library(mockery)
 
 # Mock data for raw virus table

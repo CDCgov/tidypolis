@@ -2,7 +2,7 @@
 library(testthat)
 library(dplyr)
 library(lubridate)
-library(tibble)
+library(dplyr)
 
 test_that("filters standard virus types within current week", {
   week_floor <- as.Date("2025-12-01")  # Monday
