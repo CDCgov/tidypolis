@@ -5988,15 +5988,17 @@ s2_process_coordinates <- function(data, polis_data_folder, polis_folder,
       )) |>
       dplyr::bind_rows(dup_epid_01)
 
-    for (i in 1:nrow(dup_epid_fixed |> dplyr::filter(!is.na(epid_fixed)))) {
-      update_polis_log(
-        .event = paste0(
-          "Duplicate EPID ", dup_epid_fixed[i, "epid"], " updated to: ",
-          dup_epid_fixed[i, "epid_fixed"]
-        ),
-        .event_type = "ALERT"
-      )
-    }
+    dup_epid_to_report <- dup_epid_fixed |>
+      dplyr::filter(!is.na(epid_fixed)) |>
+      dplyr::mutate(time = Sys.time(),
+                    user = Sys.getenv("USERNAME"),
+                    event = paste0("Duplicate EPID ", epid, " updated to: ", epid_fixed),
+                    event_type = "ALERT")
+
+    log <- invisible(tidypolis_io(io = "read",
+                                  file_path = Sys.getenv("POLIS_LOG_FILE")))
+    log <- dplyr::bind_rows(log, dup_epid_to_report)
+    tidypolis_io(log, "write", file_path = Sys.getenv("POLIS_LOG_FILE"))
 
     data_deduped <- dup_epid_fixed |>
       dplyr::select(-c("epid", "dup_epid")) |>
