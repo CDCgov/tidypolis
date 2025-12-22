@@ -34,6 +34,7 @@ test_that("All records have lat/lon and Admin2GUIDs", {
     nrow()
 
   expect_equal(with_coords, 10)
+  expect_equal(nrow(case_1), nrow(afp.linelist.fixes.04$all_with_pts))
 })
 
 
@@ -48,6 +49,7 @@ test_that("Some records missing lat/lon but have Admin2GUIDs", {
     nrow()
 
   expect_equal(with_coords, 10)
+  expect_equal(nrow(case_2), nrow(afp.linelist.fixes.04$some_empty_with_adm2guid))
 })
 
 
@@ -62,6 +64,7 @@ test_that("All records missing lat/lon but have Admin2GUIDs", {
     nrow()
 
   expect_equal(with_coords, 10)
+  expect_equal(nrow(case_3), nrow(afp.linelist.fixes.04$empty_with_adm2guid))
 })
 
 
@@ -76,6 +79,7 @@ test_that("All records missing both lat/lon and Admin2GUIDs", {
     nrow()
 
   expect_equal(with_coords, 0)
+  expect_equal(nrow(case_4), nrow(afp.linelist.fixes.04$empty_no_adm2guid))
 })
 
 
@@ -83,13 +87,14 @@ test_that("No geocorrection needed", {
   no_correction <- afp.linelist.fixes.04$orig |>
     dplyr::filter(epid != "INDMPRWA20034")
 
-  case_1 <- f.pre.stsample.01(no_correction, global.dist.01)
+  result <- f.pre.stsample.01(no_correction, global.dist.01)
 
-  geo_corrected <- case_1 |>
+  geo_corrected <- result |>
     dplyr::filter(geo.corrected == 1) |>
     nrow()
 
   expect_equal(geo_corrected, 0)
+  expect_equal(nrow(result), nrow(no_correction))
 })
 
 
@@ -97,13 +102,14 @@ test_that("One record needs geocorrection", {
   needs_correction <- afp.linelist.fixes.04$orig |>
     dplyr::filter(epid == "INDMPRWA20034")
 
-  case_2 <- f.pre.stsample.01(needs_correction, global.dist.01)
+  result <- f.pre.stsample.01(needs_correction, global.dist.01)
 
-  geo_corrected <- case_2 |>
+  geo_corrected <- result |>
     dplyr::filter(geo.corrected == 1) |>
     nrow()
 
   expect_equal(geo_corrected, 1)
+  expect_equal(nrow(result), nrow(needs_correction))
 })
 
 
@@ -121,7 +127,29 @@ test_that("All records with unknown Admin2GUIDs are not geocorrected", {
     dplyr::filter(geo.corrected == 1) |>
     nrow()
 
+  expect_equal(nrow(result), nrow(unknown_guid_data))
   expect_equal(geo_corrected, 0)
+})
+
+test_that("Some records have unknown ADM2GUIDs and should not be geocorrected", {
+  afp.copy <- afp.linelist.fixes.04$orig
+  afp.copy[c(1, 2, 3),]$Admin2GUID <- "{UNKNOWN_GUID}"
+  afp.copy[c(1, 2, 3),]$admin2guid  <- "UNKNOWN_GUID"
+  afp.copy[c(1, 2, 3),]$polis.latitude <- NA
+  afp.copy[c(1, 2, 3),]$polis.longitude <- NA
+
+  afp.copy <- afp.copy |>
+    dplyr::filter(epid != "INDMPRWA20034")
+
+  result <- f.pre.stsample.01(afp.copy, global.dist.01)
+
+  geo_corrected <- result |>
+    dplyr::filter(geo.corrected == 1) |>
+    nrow()
+
+  expect_equal(nrow(result), nrow(afp.copy))
+  expect_equal(geo_corrected, 0)
+
 })
 
 test_that("Output contains expected columns", {
