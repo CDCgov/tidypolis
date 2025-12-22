@@ -194,7 +194,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
     if (nrow(empty.coord.02) == 0) {
       cli::cli_alert_info("All cases with missing coordinates have GUIDs that do not exist in the spatial dataset.")
-      df08 <- df07
+      df08 <- dplyr::bind_rows(df07, empty.coord |> dplyr::mutate(geo.corrected = 0))
     } else {
       cli::cli_process_start("Placing random points for cases with bad coordinates")
 
@@ -285,13 +285,20 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
   # bind back placed point cases with df06 and finished
   df09 <- df08 |>
-    dplyr::left_join(global.dist.01 |> dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME, ADM0_GUID, ADM1_GUID, GUID),
-                     by = c("Admin0GUID" = "ADM0_GUID", "Admin1GUID" = "ADM1_GUID", "Admin2GUID" = "GUID")
+    dplyr::left_join(global.dist.01 |>
+                       dplyr::tibble() |>
+                       dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME,
+                                     Admin0GUID = ADM0_GUID,
+                                     Admin1GUID = ADM1_GUID,
+                                     Admin2GUID = GUID)
     ) |>
     dplyr::mutate(
-      geo.corrected = ifelse(paste0("{", stringr::str_to_upper(admin2guid), "}", sep = "") != Admin2GUID, 1, 0),
-      geo.corrected = ifelse(paste0("{", stringr::str_to_upper(admin1guid), "}", sep = "") != Admin1GUID, 1, geo.corrected),
-      geo.corrected = ifelse(paste0("{", stringr::str_to_upper(admin0guid), "}", sep = "") != Admin0GUID, 1, geo.corrected),
+      geo.corrected = dplyr::case_when(
+        paste0("{", stringr::str_to_upper(admin2guid), "}") != Admin2GUID ~ 1,
+        paste0("{", stringr::str_to_upper(admin1guid), "}") != Admin1GUID ~ 1,
+        paste0("{", stringr::str_to_upper(admin0guid), "}") != Admin0GUID ~ 1,
+        .default = 0
+      ),
       place.admin.0 = ifelse((place.admin.0 != ADM0_NAME | is.na(place.admin.0)) & !is.na(ADM0_NAME), ADM0_NAME, place.admin.0),
       place.admin.1 = ifelse((place.admin.1 != ADM1_NAME | is.na(place.admin.1)) & !is.na(ADM1_NAME), ADM1_NAME, place.admin.1),
       place.admin.2 = ifelse((place.admin.2 != ADM2_NAME | is.na(place.admin.2)) & !is.na(ADM2_NAME), ADM2_NAME, place.admin.2)
@@ -300,9 +307,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
       "wrongAdmin0GUID", "wrongAdmin1GUID", "wrongAdmin2GUID", "ADM1_GUID", "ADM0_GUID", "ADM0_NAME",
       "ADM1_NAME", "ADM2_NAME"
     ))) |>
-    dplyr::mutate(geo.corrected = ifelse(is.na(geo.corrected), 0, geo.corrected))
-
-  df09$Shape <- NULL
+    dplyr::mutate(geo.corrected = dplyr::if_else(is.na(geo.corrected), 0, geo.corrected))
 
   final.guid.check <- df09 |>
     dplyr::filter((paste0("{", stringr::str_to_upper(admin2guid), "}", sep = "") != Admin2GUID |
