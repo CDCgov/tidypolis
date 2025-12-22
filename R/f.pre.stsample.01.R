@@ -5,6 +5,26 @@
 #' @returns tibble with lat/lon for all unsampled locations
 #' @keywords internal
 f.pre.stsample.01 <- function(df01, global.dist.01) {
+
+  # Add check to see if none of the df01 ADM2GUIDs exist in global.dist.01
+  df_01_guid_check <- df01 |>
+    dplyr::filter(admin2guid %in% unique(global.dist.01$GUID))
+
+  if (nrow(df_01_guid_check) == 0) {
+    cli::cli_alert_info("All GUIDs don't exist in the global spatial database.")
+
+    df01 <- df01 |>
+      dplyr::mutate(
+        geo.corrected = 0,
+        lat = NA,
+        lon = NA
+      )
+
+    return(df01)
+
+  }
+
+
   # need to identify cases with no lat/lon
   empty.coord <- df01 |>
     dplyr::filter(is.na(polis.latitude) | is.na(polis.longitude) |
