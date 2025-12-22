@@ -17,11 +17,12 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
     dplyr::mutate(
       lon = polis.longitude,
       lat = polis.latitude
-    ) |>
-    sf::st_as_sf(
+    )
+
+  df01.sf <- suppressWarnings(sf::st_as_sf(df01.sf,
       coords = c(x = "lon", y = "lat"),
       crs = sf::st_crs(global.dist.01)
-    )
+    ))
 
   global.dist.02 <- sf::st_make_valid(global.dist.01)
 
