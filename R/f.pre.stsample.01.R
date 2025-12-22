@@ -8,7 +8,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
   # Add check to see if none of the df01 ADM2GUIDs exist in global.dist.01
   df_01_guid_check <- df01 |>
-    dplyr::filter(admin2guid %in% unique(global.dist.01$GUID))
+    dplyr::filter(Admin2GUID %in% unique(global.dist.01$GUID))
 
   if (nrow(df_01_guid_check) == 0) {
     cli::cli_alert_info("All GUIDs don't exist in the global spatial database.")
