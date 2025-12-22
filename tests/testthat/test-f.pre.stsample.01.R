@@ -11,7 +11,9 @@ file_path <- file.path(
 
 afp.linelist.fixes.04 <- sirfunctions::edav_io("read", file_loc = file_path)
 
-global.dist.01 <- sirfunctions::load_clean_dist_sp() |>
+global.dist.01 <- sirfunctions::get_all_polio_data()
+global.dist.01 <- global.dist.01$global.dist
+global.dist.01 <- global.dist.01 |>
   dplyr::filter(ADM0_GUID %in% unique(afp.linelist.fixes.04$orig$Admin0GUID))
 
 # ---- Tests ----
