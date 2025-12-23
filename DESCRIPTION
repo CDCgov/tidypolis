@@ -35,6 +35,7 @@ Imports:
     lifecycle,
     tools
 Suggests:
+    httpuv,
     fs,
     stats,
     arrow,
