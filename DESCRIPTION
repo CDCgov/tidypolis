@@ -1,7 +1,7 @@
 Package: tidypolis
 Type: Package
 Title: Download and process POLIS data
-Version: 2.0.2
+Version: 2.0.3
 Authors@R: c(person("Nishant", "Kishore", , "ynm2@cdc.gov", role = c("aut", "cre"), comment = c(ORCID = "0000-0003-0408-2747")),
              person("Nicholas", "Heaghney", , "uic3@cdc.gov", role = "aut"),
              person("Mervin Keith", "Cuadera", , "xrg9@cdc.gov", role = "aut", comment = c(ORCID = "0000-0003-4898-2659"))
@@ -11,7 +11,7 @@ Description: This package uses the POLIS API to ease download and processing of 
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Imports:
     cluster,
     doFuture,
@@ -35,6 +35,7 @@ Imports:
     lifecycle,
     tools
 Suggests:
+    httpuv,
     fs,
     stats,
     arrow,
