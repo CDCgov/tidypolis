@@ -8806,7 +8806,10 @@ s5_pos_create_cdc_vars <- function(virus.raw.new, polis_folder, polis_data_folde
       emergencegroup = `emergence.group(s)`,
       ntchanges = nt.changes,
       classificationvdpv = `vdpv.classification(s)`,
-      whoregion = who.region
+      whoregion = who.region,
+      created_date = 'Created Date',
+      updated_date = 'Updated Date',
+      publish_date = 'Publish Date'
     ) |>
     dplyr::mutate(
       dateonset = lubridate::ymd(virus.date),
