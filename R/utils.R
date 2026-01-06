@@ -2377,13 +2377,13 @@ preprocess_cdc <- function(polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
   missing_static_files <- check_missing_static_files(core_files_folder_path)
   if (length(missing_static_files) > 0) {
     cli::cli_alert_warning(paste0(
-      "Please request the following file(s) from the SIR team",
-      "and move them into: ", core_files_folder_path
+      "The following file(s) are missing from:", core_files_folder_path,
+
     ))
     for (file in missing_static_files) {
-      cli::cli_alert_info(paste0(file, "\n"))
+      cli::cli_alert_info(file)
     }
-    cli::cli_abort("Halting execution of preprocessing due to missing files.")
+
   }
   rm(core_files_folder_path, missing_static_files)
 
