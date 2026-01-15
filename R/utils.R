@@ -472,7 +472,7 @@ get_table_size <- function(.table,
     paste0(
       polis_api_root_url,
       table_data$endpoint,
-      "?$inlinecount=allpages&$top=0",
+      "?$count=true&$top=0",
       extra_filter
     )
 
