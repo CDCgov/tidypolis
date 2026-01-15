@@ -174,9 +174,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
       time_modifier <- paste0(
         "&$filter=",
         table_data$polis_update_id,
-        " gt DateTime'",
-        sub(" ", "T", as.character(table_data$polis_update_value)),
-        "'"
+        " gt ",
+        sub(" ", "T", as.character(table_data$polis_update_value))
       )
 
       time_modifier <- gsub(" ", "+", time_modifier, )
@@ -205,9 +204,8 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
           table_url,
           "?$filter=",
           table_data$polis_update_id,
-          " gt DateTime'",
+          " gt ",
           sub(" ", "T", as.character(table_data$polis_update_value)),
-          "'"
         )
 
         table_url <- gsub(" ", "+", table_url, )
@@ -497,7 +495,7 @@ get_table_size <- function(.table,
     httr::content(type = "text", encoding = "UTF-8") |>
     jsonlite::fromJSON()
 
-  table_size <- as.integer(table_size$odata.count)
+  table_size <- as.integer(table_size$`@odata.count`)
 
   return(table_size)
 }
