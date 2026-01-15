@@ -2906,11 +2906,12 @@ process_spatial <- function(gdb_folder,
 #'
 #' @param azcontainer Azure validated container object.
 #' @param proxy_data_loc str location of proxy_data on EDAV
-#' @param polis_pos_loc str location of latest positives dataset generated from POLIS API data
+#' @param polis_pos_loc str location of latest positives dataset generated from POLIS API data. This is located in
+#' /Data/polis and is a file name starting with "positives_2001-01-01".
 #' @keywords internal
 add_gpei_cases <- function(azcontainer = suppressMessages(get_azure_storage_connection()),
                            proxy_data_loc = "/Data/proxy/polio_proxy_data.csv",
-                           polis_pos_loc = "/Data/polis/positives_2001-01-01_2025-01-06.rds") {
+                           polis_pos_loc) {
   cli::cli_abort("This function is in draft and cannot be used at this time.")
 
   long.global.ctry <- sirfunctions::load_clean_ctry_sp(type = "long")
@@ -8707,7 +8708,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
       output_folder_name,
       "/"
     ), "")) |>
-    dplyr::filter(grepl(paste0("^(afp_linelist_2001-01-01_2025).*(\\", output_format, ")$"), short_name)) |>
+    dplyr::filter(grepl(paste0("^(afp_linelist_2001-01-01).*(\\", output_format, ")$"), short_name)) |>
     dplyr::pull(name)
 
   tryCatch(
@@ -8727,7 +8728,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
   non.afp.files.01 <- dplyr::tibble("name" = tidypolis_io(io = "list", file_path = file.path(polis_data_folder, output_folder_name), full_names = T)) |>
     dplyr::mutate(short_name = stringr::str_replace(name, paste0(polis_data_folder, "/", output_folder_name, "/"), "")) |>
     dplyr::filter(grepl(paste0(
-      "^(other_surveillance_type_linelist_2016_2025).*(\\",
+      "^(other_surveillance_type_linelist_2016).*(\\",
       output_format, ")$"
     ), short_name)) |>
     dplyr::pull(name)
