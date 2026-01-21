@@ -175,10 +175,9 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
         "&$filter=",
         table_data$polis_update_id,
         " gt ",
-        sub(" ", "T", as.character(table_data$polis_update_value))
-      )
+        sub(" ", "T", as.character(table_data$polis_update_value)), "Z")
 
-      time_modifier <- gsub(" ", "+", time_modifier, )
+      time_modifier <- gsub(" ", "+", time_modifier)
 
       table_size <-
         get_table_size(.table = table_data$table, extra_filter = time_modifier)
@@ -206,9 +205,10 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
           table_data$polis_update_id,
           " gt ",
           sub(" ", "T", as.character(table_data$polis_update_value)),
+          "Z"
         )
 
-        table_url <- gsub(" ", "+", table_url, )
+        table_url <- gsub(" ", "+", table_url)
 
         if (table_data$table %in% c(
           "human_specimen",
