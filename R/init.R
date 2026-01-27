@@ -156,7 +156,7 @@ init_tidypolis <- function(
         "RefData", "Population"
       ),
       "polis_id" = c(
-        NA, "VirusId", "EPID", "SpecimenId", "EnviroSampleManualEditId", "SubActivityId", "SubActivityByAdmin2Id",
+        NA, "VirusId", "CaseManualEditId", "SpecimenId", "EnviroSampleManualEditId", "SubActivityId", "SubActivityByAdmin2Id",
         "LqasId", "ImId", "FK_GeoplaceId", "PlaceId", NA, NA, NA, "Id"
       ),
       "polis_update_id" = c(
