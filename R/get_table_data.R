@@ -21,41 +21,22 @@ get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
     paste0(
       base_url,
       table_data$endpoint,
-      "?$select=",
+      "?$top=1&$select=",
       table_data$polis_id
     )
 
-  if (table_data$table %in% c(
-    "human_specimen",
-    "environmental_sample",
-    "activity",
-    "sub_activity",
-    "lqas",
-    "pop"
-  )) {
-    urls <-
-      create_table_urls(
-        url = api_url,
-        table_size = 3000,
-        type = "lab-partial"
-      )
-  } else {
-    urls <-
-      create_table_urls(
-        url = api_url,
-        table_size = 3000,
-        type = "partial"
-      )
-  }
-
   id_return <- tryCatch(
-    call_single_url(urls[1], times = 1),
+    call_single_url(api_url, times = 1),
     error = function(cond) {
       return("Error")
     }
   )
 
-  id_error <- is.character(id_return)
+  if (nrow(id_return) == 1) {
+    id_error <- FALSE
+  } else {
+    id_error <- TRUE
+  }
 
   rm(urls)
   rm(api_url)
