@@ -3,11 +3,14 @@
 #' @description
 #' Call a return the formatted output from one URL.
 #'
+#' @details
+#' The function is designed for API endpoints that support skiptokens argument.
+#'
 #' @param url `str` Single url.
 #' @param api_key `str` validated API key.
 #' @param times `int` Number of times to attempt connection with API.
+#' @returns `tibble` Data from the response.
 #' @export
-#' @returns tibble
 #' @examples
 #' \dontrun{
 #' call_single_url("https://extranet.who.int/polis/api/v2/Virus?$filter=VirusDate%20gt%202025-01-01")

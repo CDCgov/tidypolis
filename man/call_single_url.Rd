@@ -14,10 +14,13 @@ call_single_url(url, api_key = Sys.getenv("POLIS_API_KEY"), times = 10)
 \item{times}{\code{int} Number of times to attempt connection with API.}
 }
 \value{
-tibble
+\code{tibble} Data from the response.
 }
 \description{
 Call a return the formatted output from one URL.
+}
+\details{
+The function is designed for API endpoints that support skiptokens argument.
 }
 \examples{
 \dontrun{
