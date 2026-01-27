@@ -670,7 +670,6 @@ call_urls <- function(urls) {
   return(resp)
 }
 
-
 #' Call single URL
 #' @description Call a return the formatted output frome one URL
 #' @param url `str` single url
@@ -685,7 +684,6 @@ call_single_url <- function(url,
   httr::set_config(httr::config(ssl_verifypeer = 0L))
 
   # response <- httr::GET(url=url, httr::add_headers("authorization-token" = api_key))
-
   response <- httr::RETRY(
     verb = "GET",
     url = url,
@@ -696,10 +694,26 @@ call_single_url <- function(url,
   )
 
   out <- jsonlite::fromJSON(rawToChar(response$content))
+  value <- dplyr::as_tibble(out$value)
+  nextLink <- out$`@odata.nextLink`
 
-  dplyr::as_tibble(out$value)
+  while (!is.null(nextLink)) {
+    response <- httr::RETRY(
+      verb = "GET",
+      url = nextLink,
+      config = httr::add_headers("authorization-token" = api_key),
+      times = times,
+      quiet = TRUE,
+      terminate_on_success = TRUE
+    )
 
-  # Sys.sleep(1.25)
+    out <- jsonlite::fromJSON(rawToChar(response$content))
+    value <- dplyr::bind_rows(value, dplyr::as_tibble(out$value))
+    nextLink <- out$`@odata.nextLink`
+  }
+
+  return(value)
+
 }
 
 #' Run single table diagnostic
