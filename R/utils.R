@@ -843,21 +843,36 @@ update_polis_log <- function(log_file = Sys.getenv("POLIS_LOG_FILE"),
 
 #' Load local POLIS cache
 #'
-#' @description Pull cache data for a particular table
-#' @param cache_file `str` location of cache file
-#' @param .table `str` table to be loaded
-#' @returns Return tibble with table information
+#' @description Pull metadata for a particular POLIS table.
+#'
+#' @param cache_file `str` Location of cache file.
+#' @param .table `str` Table(s) to be loaded. A vector of table names can be passed. Defaults to `NULL`,
+#' which loads the cache file in full.
+#'
+#' @returns `tibble` Metadata of the POLIS API table specified.
 #' @export
+#' @examples
+#' \dontrun{
+#' cache <- get_polis_cache()
+#' }
+#'
 get_polis_cache <- function(cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-                            .table) {
+                            .table = NULL) {
   cache <- tidypolis_io(io = "read", file_path = cache_file)
 
-  if (.table %in% dplyr::pull(cache, table)) {
-    cache |>
-      dplyr::filter(table == .table)
-  } else {
-    cli::cli_alert_warning(paste0("No entry found in the cache table for: ", .table))
+  if (is.null(.table)) {
+    return(cache)
   }
+
+  cache <- cache |>
+    dplyr::filter(table %in% .table)
+
+  if (nrow(cache) == 0) {
+    cli::cli_alert_warning(paste0("No entry found in the table(s) specified"))
+  } else {
+    return(cache)
+  }
+
 }
 
 
