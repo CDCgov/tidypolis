@@ -58,16 +58,14 @@ get_full_table <- function(id_error, table_data) {
 #'
 update_polis_table <- function(table_data, table_url) {
 
-    time_modifier <- paste0(
-      "&$filter=",
-      table_data$polis_update_id,
-      " gt ",
-      sub(" ", "T", as.character(table_data$polis_update_value)), "Z")
+  time_modifier <- paste0(
+    "&$filter=",
+    table_data$polis_update_id,
+    " gt ",
+    sub(" ", "T", as.character(table_data$polis_update_value)), "Z")
 
-    time_modifier <- gsub(" ", "+", time_modifier)
-
-    table_size <-
-      get_table_size(.table = table_data$table, extra_filter = time_modifier)
+  time_modifier <- gsub(" ", "+", time_modifier)
+    table_size <- get_table_size(.table = table_data$table, extra_filter = time_modifier)
 
     if (table_size == 0) {
       cli::cli_alert_success("No new records. Skipping download.")
@@ -99,38 +97,7 @@ update_polis_table <- function(table_data, table_url) {
       .event_type = "INFO"
     )
 
-    table_url <- paste0(
-      table_url,
-      "?$filter=",
-      table_data$polis_update_id,
-      " gt ",
-      sub(" ", "T", as.character(table_data$polis_update_value)),
-      "Z"
-    )
-
-    table_url <- gsub(" ", "+", table_url)
-
-    if (table_data$table %in% c(
-      "human_specimen",
-      "environmental_sample",
-      "activity",
-      "sub_activity",
-      "lqas"
-    )) {
-      urls <-
-        create_table_urls(
-          url = table_url,
-          table_size = table_size,
-          type = "lab-partial"
-        )
-    } else {
-      urls <-
-        create_table_urls(
-          url = table_url,
-          table_size = table_size,
-          type = "partial"
-        )
-    }
+    urls <- create_table_urls(table_url, table_data)
 
     cli::cli_process_start("Downloading data")
     out <- call_urls(urls)

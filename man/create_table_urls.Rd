@@ -4,18 +4,21 @@
 \alias{create_table_urls}
 \title{Create table URLs}
 \usage{
-create_table_urls(url, table_size, type)
+create_table_urls(url, table_data)
 }
 \arguments{
-\item{url}{\code{str} base url to be queried}
+\item{url}{\code{str} Base url to be queried.}
 
-\item{table_size}{\code{int} integer of download}
-
-\item{type}{\code{str} "full" or "partial"}
+\item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
 }
 \value{
-array of urls
+\code{str} Array of URLs to be used in \code{\link[=call_urls]{call_urls()}}.
 }
 \description{
-create urls from table size and base url
+Create URLs for a table to assist in parallelization. Each table will need to be
+segmented based on their structure.
 }
+\details{
+Valid values for \code{.table} can be found by looking at the cache via \code{\link[=get_polis_cache]{get_polis_cache()}}.
+}
+\keyword{internal}
