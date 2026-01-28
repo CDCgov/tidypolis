@@ -2,24 +2,25 @@
 % Please edit documentation in R/get_table_data.R
 \name{get_table_data}
 \alias{get_table_data}
-\title{Request data from single table}
+\title{Request data for single table in POLIS}
 \usage{
 get_table_data(.table, api_key = Sys.getenv("POLIS_API_Key"))
 }
 \arguments{
-\item{.table}{Table value to retrieve}
+\item{.table}{\code{str} Name of the table to retrieve. Valid values include cache, virus, case,
+human_specimen, environmental_sample, activity, sub_activity, lqas, im, population, geography.}
 
-\item{api_key}{API Key}
+\item{api_key}{\code{str} API Key. Defaults to the value of the global env variable POLIS_API_KEY.}
 }
 \value{
-Tibble with reference data
+\code{NULL} upon success.
 }
 \description{
-Get POLIS table Data
+Updates or pulls the full table from the API for the table specified.
 }
 \examples{
 \dontrun{
-get_table_data(.table = "case")
-get_table_data(.table = "virus") # must run init_tidypolis first in order to specify API key
+get_table_data("case")
+get_table_data("virus")
 }
 }

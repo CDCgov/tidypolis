@@ -40,7 +40,7 @@ get_full_table <- function(id_error, table_data) {
 
     return(TRUE)
   } else {
-    cli::cli_alert_success(paste0("Updating the ", table_data$endpoint, "table."))
+    cli::cli_alert_success(paste0("Updating the ", table_data$endpoint, " table."))
     return(FALSE)
   }
 }
@@ -411,16 +411,19 @@ download_full_polis_table <- function(table_data) {
 # Main function ----
 
 
-#' Request data from single table
+#' Request data for single table in POLIS
 #'
-#' @description Get POLIS table Data
-#' @param api_key API Key
-#' @param .table Table value to retrieve
-#' @returns Tibble with reference data
+#' @description
+#' Updates or pulls the full table from the API for the table specified.
+#'
+#' @param .table `str` Name of the table to retrieve. Valid values include cache, virus, case,
+#' human_specimen, environmental_sample, activity, sub_activity, lqas, im, population, geography.
+#' @param api_key `str` API Key. Defaults to the value of the global env variable POLIS_API_KEY.
+#' @returns `NULL` upon success.
 #' @examples
 #' \dontrun{
-#' get_table_data(.table = "case")
-#' get_table_data(.table = "virus") # must run init_tidypolis first in order to specify API key
+#' get_table_data("case")
+#' get_table_data("virus")
 #' }
 #' @export
 get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key")) {
@@ -458,9 +461,11 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key")) {
 
 
   if (full_dl) {
-    download_full_polis_table()
+    download_full_polis_table(table_data)
   } else {
-    update_polis_table()
+    update_polis_table(table_data)
   }
+
+  return(NULL)
 
 }
