@@ -115,7 +115,7 @@ update_polis_table <- function(table_data, table_url) {
 
     # check ids and make list of ids to be deleted
     cli::cli_process_start("Getting table Ids")
-    ids <- get_table_ids(.table = table_data$table, .id = table_data$polis_id)
+    ids <- get_table_ids(table_data)
     cli::cli_process_done()
 
     # load in cache

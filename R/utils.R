@@ -53,68 +53,6 @@ get_table_size <- function(.table,
   return(table_size)
 }
 
-#' Get Ids
-#'
-#' @description return Ids availalbe in table
-#' @param .table `str` table
-#' @param .id `str` id variable
-#' @param api_key `str` POLIS API Key
-#' @returns character array of ids
-#' @export
-get_table_ids <-
-  function(.table, .id, api_key = Sys.getenv("POLIS_API_KEY")) {
-    cli::cli_process_start(paste0("Downloading ", .table, " table IDs"))
-
-    table_data <- get_polis_cache(.table = .table)
-
-    # disable SSL Mode
-    httr::set_config(httr::config(ssl_verifypeer = 0L))
-
-    # Variables: URL, Token, Filters, ...
-    polis_api_root_url <- "https://extranet.who.int/polis/api/v2/"
-
-    api_url <-
-      paste0(
-        polis_api_root_url,
-        table_data$endpoint,
-        "?$select=",
-        table_data$polis_id
-      )
-
-    table_size <- get_table_size(.table = .table)
-
-    if (table_data$table %in% c(
-      "human_specimen",
-      "environmental_sample",
-      "activity",
-      "sub_activity",
-      "lqas"
-    )) {
-      urls <-
-        create_table_urls(
-          url = api_url,
-          table_size = table_size,
-          type = "lab-partial"
-        )
-    } else {
-      urls <-
-        create_table_urls(
-          url = api_url,
-          table_size = table_size,
-          type = "partial"
-        )
-    }
-
-    ids <- call_urls(urls) |>
-      dplyr::pull(table_data$polis_id)
-
-    gc()
-
-    cli::cli_process_done()
-
-    return(ids)
-  }
-
 #### POLIS API ####
 
 #' Test out if POLIS key is valid
