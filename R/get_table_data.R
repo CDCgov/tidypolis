@@ -97,7 +97,7 @@ update_polis_table <- function(table_data, table_url) {
       .event_type = "INFO"
     )
 
-    urls <- create_table_urls(table_url, table_data)
+    urls <- create_table_urls(table_url, table_data, NULL) # disable chunking until issues with POLIS resolves
 
     cli::cli_process_start("Downloading data")
     out <- call_urls(urls)
@@ -188,6 +188,27 @@ update_polis_table <- function(table_data, table_url) {
     missed.id <- ids_table |>
       dplyr::filter(!ids %in% dplyr::pull(old_cache[table_data$polis_id]))
     cli::cli_process_done()
+
+    if (nrow(missed.id) != 0) {
+
+      cli::cli_alert_info(
+        paste0(
+          table_data$endpoint,
+          " has been downloaded before but ",
+          nrow(missed.id),
+          " record(s) missing, downloading data from missed record(s)..."
+        )
+      )
+      request_missing_recs <- paste0(table_url, "?$filter=",table_data$polis_id,
+                                      " in ", "('", paste0(missed.id, collapse = "','"), "')")
+      request_missing_recs <- gsub(" ", "+", request_missing_recs)
+
+      missing_epids_data <- call_single_url(request_missing_epids)
+
+      old_cache <- bind_and_reconcile(new_data = missing_epids_data, old_data = old_cache)
+      cli::cli_alert_success("Added missing records to the cache")
+
+    }
 
     # if there are missed IDs, clear old cache and re-download full table
     if (nrow(missed.id) > 0) {
