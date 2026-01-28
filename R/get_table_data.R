@@ -51,11 +51,12 @@ get_full_table <- function(id_error, table_data) {
 #' Will download data above the update date recorded in the metadata cache.
 #'
 #' @param table_data `tibble` One row tibble with the data for a specific table.
+#' @param table_url `str` URL of the endpoint for the specific table.
 #'
 #' @returns `NULL`
 #' @keywords internal
 #'
-update_polis_table <- function(table_data) {
+update_polis_table <- function(table_data, table_url) {
 
     time_modifier <- paste0(
       "&$filter=",
@@ -352,10 +353,12 @@ update_polis_table <- function(table_data) {
 #' @returns `NULL` upon success.
 #' @keywords internal
 #'
-download_full_polis_table <- function(table_data) {
+download_full_polis_table <- function(table_data, table_url) {
 
   table_size <- get_table_size(.table = table_data$table)
   cli::cli_alert_info(paste0("Getting ready to download ", table_size, " new rows of data!"))
+
+  # Create table URLs here; where to shard will depend on the table
 
   cli::cli_process_start("Downloading data")
   out <- call_urls(urls)
@@ -461,9 +464,9 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key")) {
 
 
   if (full_dl) {
-    download_full_polis_table(table_data)
+    download_full_polis_table(table_data, table_url)
   } else {
-    update_polis_table(table_data)
+    update_polis_table(table_data, table_url)
   }
 
   return(NULL)

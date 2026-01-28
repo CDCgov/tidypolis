@@ -4,10 +4,12 @@
 \alias{update_polis_table}
 \title{Update the POLIS table}
 \usage{
-update_polis_table(table_data)
+update_polis_table(table_data, table_url)
 }
 \arguments{
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
+
+\item{table_url}{\code{str} URL of the endpoint for the specific table.}
 }
 \value{
 \code{NULL}
