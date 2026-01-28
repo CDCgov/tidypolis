@@ -115,8 +115,7 @@ update_polis_table <- function(table_data, table_url) {
 
     # check ids and make list of ids to be deleted
     cli::cli_process_start("Getting table Ids")
-    ids <-
-      get_table_ids(.table = table_data$table, .id = table_data$polis_id)
+    ids <- get_table_ids(.table = table_data$table, .id = table_data$polis_id)
     cli::cli_process_done()
 
     # load in cache
@@ -129,13 +128,12 @@ update_polis_table <- function(table_data, table_url) {
         ".rds"
       ))
     cli::cli_process_done()
+
     old_cache_n <- nrow(old_cache)
     new_data_ids_in_old_cache <-
       sum(dplyr::pull(out[table_data$polis_id]) %in% dplyr::pull(old_cache[table_data$polis_id]))
     new_data_ids <- table_size - new_data_ids_in_old_cache
-    deleted_ids <-
-      dplyr::pull(old_cache[table_data$polis_id])[!dplyr::pull(old_cache[table_data$polis_id]) %in% ids]
-    # old_data_ids_in_new <- dplyr::pull(old_cache[table_data$polis_id])[dplyr::pull(old_cache[table_data$polis_id]) %in% dplyr::pull(out[table_data$polis_id])]
+    deleted_ids <- dplyr::pull(old_cache[table_data$polis_id])[!dplyr::pull(old_cache[table_data$polis_id]) %in% ids]
 
     cli::cli_h3(paste0("'", table_data$table, "'", " table data"))
     cli::cli_bullets(c(
@@ -174,8 +172,7 @@ update_polis_table <- function(table_data, table_url) {
     # update cache
     old_cache <- old_cache |>
       dplyr::filter(!get(table_data$polis_id) %in% dplyr::pull(out[table_data$polis_id]))
-    old_cache <-
-      bind_and_reconcile(new_data = out, old_data = old_cache)
+    old_cache <- bind_and_reconcile(new_data = out, old_data = old_cache)
 
     # delete data that no longer exists in POLIS
     old_cache <- old_cache |>
@@ -210,128 +207,34 @@ update_polis_table <- function(table_data, table_url) {
 
     }
 
-    # if there are missed IDs, clear old cache and re-download full table
-    if (nrow(missed.id) > 0) {
-      cli::cli_alert_info(
-        paste0(
-          table_data$endpoint,
-          " has been downloaded before but ",
-          nrow(missed.id),
-          " record(s) missing, downloading all data...checking size..."
-        )
-      )
+    cli::cli_process_start("Updating cache log")
+    update_polis_cache(
+      cache_file = Sys.getenv("POLIS_CACHE_FILE"),
+      .table = .table,
+      .nrow = nrow(old_cache),
+      .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])))
+    )
+    cli::cli_process_done()
 
-      table_size <- get_table_size(.table = table_data$table)
-      cli::cli_alert_info(paste0("Getting ready to download ", table_size, " new rows of data!"))
-
-      table_url <- paste0(base_url, table_data$endpoint)
-
-      if (table_data$table %in% c(
-        "human_specimen",
-        "environmental_sample",
-        "activity",
-        "sub_activity",
-        "lqas",
-        "pop"
-      )) {
-        urls <-
-          create_table_urls(
-            url = table_url,
-            table_size = table_size,
-            type = "lab"
-          )
-      } else {
-        urls <-
-          create_table_urls(
-            url = table_url,
-            table_size = table_size,
-            type = "full"
-          )
-      }
-
-      cli::cli_process_start("Downloading data")
-      out <- call_urls(urls)
-      update_polis_log(
-        .event = paste0(
-          "Downloaded ",
-          table_size,
-          " rows of ",
-          table_data$table,
-          " data"
-        ),
-        .event_type = "INFO"
-      )
-      cli::cli_process_done()
-
-      # update cache information
-      cli::cli_process_start("Updating cache")
-      if (is.na(table_data$polis_update_id)) {
-        update_polis_cache(
-          cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-          .table = .table,
-          .nrow = nrow(out),
-          .update_val = NA
-        )
-      } else {
-        update_polis_cache(
-          cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-          .table = .table,
-          .nrow = nrow(out),
-          .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])), na.rm = T)
-        )
-      }
-
-      cli::cli_process_done()
-
-      cli::cli_process_start("Writing data cache")
-      tidypolis_io(obj = out, io = "write", file_path = paste0(
+    cli::cli_process_start("Writing data cache")
+    tidypolis_io(
+      obj = old_cache, io = "write",
+      file_path = paste0(
         Sys.getenv("POLIS_DATA_CACHE"),
         "/",
         table_data$table,
         ".rds"
-      ))
-      update_polis_log(
-        .event = paste0(table_data$table, " data saved locally"),
-        .event_type = "PROCESS"
       )
-      cli::cli_process_done()
+    )
 
-      gc()
-
-      cli::cli_process_done()
-    } else {
-      # write cache
-
-      cli::cli_process_start("Updating cache log")
-      update_polis_cache(
-        cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-        .table = .table,
-        .nrow = nrow(old_cache),
-        .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])))
-      )
-      cli::cli_process_done()
-
-      cli::cli_process_start("Writing data cache")
-      tidypolis_io(
-        obj = old_cache, io = "write",
-        file_path = paste0(
-          Sys.getenv("POLIS_DATA_CACHE"),
-          "/",
-          table_data$table,
-          ".rds"
-        )
-      )
-      update_polis_log(
-        .event = paste0(table_data$table, " data saved locally"),
-        .event_type = "PROCESS"
-      )
-      cli::cli_process_done()
-
-      # garbage clean
-      gc()
-    }
+    update_polis_log(
+      .event = paste0(table_data$table, " data saved locally"),
+      .event_type = "PROCESS"
+    )
+    cli::cli_process_done()
 
   return(NULL)
+
 }
 
 #' Download the full table from POLIS
