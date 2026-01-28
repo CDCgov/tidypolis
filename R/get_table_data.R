@@ -423,8 +423,12 @@ download_full_polis_table <- function(table_data) {
 #' get_table_data(.table = "virus") # must run init_tidypolis first in order to specify API key
 #' }
 #' @export
-get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
-                           .table) {
+get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key")) {
+
+  if (api_key == "") {
+    cli::cli_abort("Please run {.code init_tidypolis()} prior to pulling table data.")
+  }
+
   base_url <- "https://extranet.who.int/polis/api/v2/"
   table_data <- get_polis_cache(.table = .table)
   table_url <- paste0(base_url, table_data$endpoint)
