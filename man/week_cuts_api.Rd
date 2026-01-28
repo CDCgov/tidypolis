@@ -4,10 +4,12 @@
 \alias{week_cuts_api}
 \title{Cuts the update dates into time intervals}
 \usage{
-week_cuts_api(anchor_date, days_intervals = 7)
+week_cuts_api(anchor_date, update_col, days_intervals = NULL)
 }
 \arguments{
 \item{anchor_date}{\code{str} The latest update date from a table.}
+
+\item{update_col}{\code{str} Name of the column with the update date, if applicable.}
 
 \item{days_intervals}{\code{int} Number of days for each interval.}
 }

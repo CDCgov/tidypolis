@@ -4,12 +4,15 @@
 \alias{create_table_urls}
 \title{Create table URLs}
 \usage{
-create_table_urls(url, table_data)
+create_table_urls(url, table_data, days_intervals = 7)
 }
 \arguments{
 \item{url}{\code{str} Base url to be queried.}
 
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
+
+\item{days_intervals}{\code{int} Number of days for each interval. If set to \code{NULL}, then
+the request will not be chunked.}
 }
 \value{
 \code{str} Array of URLs to be used in \code{\link[=call_urls]{call_urls()}}.

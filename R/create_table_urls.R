@@ -18,12 +18,18 @@
 #' @returns `str` A vector of strings representing date intervals.
 #' @keywords internal
 #'
-week_cuts_api <- function(anchor_date, update_col, days_intervals = 7) {
+week_cuts_api <- function(anchor_date, update_col, days_intervals = NULL) {
+
   # Normalize anchor_date to POSIXct in UTC
   a <- if (inherits(anchor_date, "POSIXct")) {
     lubridate::with_tz(anchor_date, "UTC")
   } else {
     lubridate::ymd_hms(anchor_date, tz = "UTC")
+  }
+
+  if (is.null(days_intervals)) {
+    return(paste0(update_col, " gt ", format(a, "%Y-%m-%dT%H:%M:%OS3Z"),
+                  "&$orderby=", update_col, " asc"))
   }
 
   by <- lubridate::ddays(days_intervals)
@@ -61,7 +67,8 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = 7) {
       update_col,
       " gt ", starts_str[-length(starts_str)],
       " and ",
-      update_col, " le ", ends_str[-length(ends_str)]
+      update_col, " le ", ends_str[-length(ends_str)],
+      "&$orderby=", update_col, " asc"
     )
   )
 
@@ -69,13 +76,12 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = 7) {
     start = starts_str[length(starts_str)],
     end   = NA_character_,
     open_ended = TRUE,
-    interval   = paste0(update_col, " gt ", starts_str[length(starts_str)])
+    interval   = paste0(update_col, " gt ", starts_str[length(starts_str)],
+                        "&$orderby=", update_col, " asc")
   )
 
   full_cut <- dplyr::bind_rows(fixed_rows, last_row) |>
     dplyr::pull(interval)
-
-  full_cut[1] <- gsub("gt", "ge", full_cut[1])
 
   return(full_cut)
 }
@@ -89,13 +95,14 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = 7) {
 #'
 #' @param url `str` Base url to be queried.
 #' @param table_data `tibble` One row tibble with the data for a specific table.
+#' @param days_intervals `int` Number of days for each interval. If set to `NULL`, then
+#' the request will not be chunked.
 #' @details
 #' Valid values for `.table` can be found by looking at the cache via [get_polis_cache()].
 #'
 #' @returns `str` Array of URLs to be used in [call_urls()].
 #' @keywords internal
-create_table_urls <- function(url,
-                              table_data) {
+create_table_urls <- function(url, table_data, days_intervals = 7) {
 
   with_update_col <- c("virus", "case", "human_specimen", "environmental_sample",
                        "activity", "sub_activity", "population")
@@ -107,11 +114,17 @@ create_table_urls <- function(url,
 
     if (!is.na(update_date)) {
       # Download from last update date
-      date_intervals <- week_cuts_api(update_date, table_data$polis_update_id , 7)
+      date_intervals <- week_cuts_api(update_date, table_data$polis_update_id , days_intervals)
     } else {
       # Download all data in the table beginning from 2000-01-01
       # since no last sync data
-      date_intervals <- week_cuts_api("2000-01-01T00:00:00Z", table_data$polis_update_id, 365)
+      # If days intervals is not null, change to 365.
+      if (!is.null(days_intervals)) {
+        full_pull <- 365
+      } else {
+        full_pull <- NULL
+      }
+      date_intervals <- week_cuts_api("2000-01-01T00:00:00Z", table_data$polis_update_id, full_pull)
     }
 
     urls <- paste0(url, "?$filter=", date_intervals)
