@@ -25,8 +25,8 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
         table_data$polis_id
       )
 
-    day_intervals <- ifelse(parallel_calls, 365, NULL)
-    urls <- create_table_urls(url, table_data, days_intervals)
+    days_interval <- ifelse(parallel_calls, 365, NULL)
+    urls <- create_table_urls(url, table_data, days_interval)
     response <- call_urls(urls)
     ids <- response |> dplyr::pull(table_data$polis_id)
 

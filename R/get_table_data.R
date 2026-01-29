@@ -98,8 +98,8 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
       .event_type = "INFO"
     )
 
-    day_intervals <- ifelse(parallel_calls, 7, NULL)
-    urls <- create_table_urls(url, table_data, days_intervals)
+    days_interval <- ifelse(parallel_calls, 7, NULL)
+    urls <- create_table_urls(url, table_data, days_interval)
 
     cli::cli_process_start("Downloading data")
     out <- call_urls(urls)
@@ -252,8 +252,8 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
   cli::cli_alert_info(paste0("Getting ready to download ", table_size, " new rows of data!"))
 
   # Create table URLs here; where to shard will depend on the table
-  day_intervals <- ifelse(parallel_calls, 365, NULL)
-  urls <- create_table_urls(table_url, table_data, days_intervals)
+  days_interval <- ifelse(parallel_calls, 365, NULL)
+  urls <- create_table_urls(table_url, table_data, days_interval)
 
   cli::cli_process_start("Downloading data")
   out <- call_urls(urls)
