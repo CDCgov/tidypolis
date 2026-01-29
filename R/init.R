@@ -322,17 +322,25 @@ init_tidypolis <- function(
 
 #' Manager function to get and update POLIS data
 #'
-#' @description This function iterates through all tables and loads POLIS data. It
+#' @description
+#' This function iterates through all tables and loads POLIS data. It
 #' checks to ensure that new rows are created, data are updated accordingly and
 #' deleted rows are reflected in the local system.
-#' @param type choose to download population data ("pop") or all other data. Default's to "all"
+#' @param type `str` Choose to download population data ("pop") or all other data. Defaults to "all",
+#' which includes Virus, Case, Human Specimen, Environmental Sample, Activity, Subactivity, LQAS, and IM.
+#' @param parallel_calls `str` Whether to get table IDs using parallel calls. Defaults to `TRUE`.
 #' @examples
 #' \dontrun{
-#' get_polis_data() # must be run after using init_tidypolis and providing a valid API key
+#' get_polis_data() # must be run after using init_tidypolis and providing a valid API key.
 #' }
 #' @export
-get_polis_data <- function(type = "all") {
-  if (type == "all") {
+get_polis_data <- function(type = "all", parallel_calls = TRUE) {
+
+  valid_types <- c("all", "virus", "case", "human_specimen",
+                   "environmental_sample", "activity", "sub_activity", "lqas",
+                   "im", "pop")
+
+  if (length(type) == 1 && type == "all") {
     tables <- c(
       "virus", "case", "human_specimen", "environmental_sample",
       "activity", "sub_activity", "lqas", "im"
@@ -344,9 +352,8 @@ get_polis_data <- function(type = "all") {
     )
 
     sapply(tables, function(x) get_table_data(.table = x))
-  }
+  } else if (length(type) == 1 && type == "pop") {
 
-  if (type == "pop") {
     update_polis_log(
       .event = "Start POLIS pop download",
       .event_type = "START"
@@ -355,10 +362,32 @@ get_polis_data <- function(type = "all") {
     get_table_data(.table = "pop")
 
     update_polis_log(
-      .event = "POLIS Pop file donwloaded",
+      .event = "POLIS Pop file downloaded",
       .event_type = "END"
     )
+  } else if (length(type) > 1) {
+    invalid <- setdiff(type, valid_types)
+
+    if (length(invalid) > 0) {
+      cli::cli_alert_info("The following type passed are invalid: ")
+      cli::cli_li(invalid)
+    }
+
+    valid <- type[!type %in% invalid]
+
+    if (length(valid) == 0) {
+      cli::cli_abort("All the types passed are invalid.")
+    }
+
+    has_all <- sum(stringr::str_detect(valid, "all"))
+
+    if(has_all >= 1) {
+      cli::cli_abort("Please pass only 'all' or types excluding 'all'.")
+    }
+
+    sapply(type, function(x) get_table_data(.table = x, parallel_calls = parallel_calls))
   }
+
 }
 
 
