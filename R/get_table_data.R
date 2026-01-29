@@ -1,5 +1,27 @@
 # Private functions ----
 
+#' Create an extract file of an API table
+#'
+#' @description
+#' Create an extract file of an API table and put it in the extract
+#' folder of the API table. The extract only contains new data that were updated
+#' since the last API pull.
+#'
+#' @inheritParams update_polis_table
+#' @param extract `tibble` Newly updated data for the table specified.
+#'
+#' @returns `NULL` upon success
+#' @keywords internal
+#'
+create_extract_file <- function(table_data, extract) {
+
+  # Add extract to the extract table folder
+  utc_time_stamp <- as.POSIXct(Sys.time(), tz = "UTC")
+  extract_name <- paste0(utc_time_stamp,"_", table_data$table, ".parquet")
+  tidypolis_io(extract, "write", extract_name)
+
+}
+
 #' Should full table be downloaded?
 #'
 #' @param id_error `logical` Whether the ID column is function.
@@ -289,7 +311,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
   cli::cli_process_done()
 
   # update cache information
-  cli::cli_process_start("Updating cache")
+  cli::cli_process_start("Updating metadata cache")
   if (is.na(table_data$polis_update_id)) {
     update_polis_cache(
       cache_file = Sys.getenv("POLIS_CACHE_FILE"),
@@ -309,14 +331,27 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
   cli::cli_process_done()
 
   cli::cli_process_start("Writing data cache")
-  tidypolis_io(obj = out, io = "write", file_path = paste0(
-    Sys.getenv("POLIS_DATA_CACHE"),
-    "/",
-    table_data$table,
-    ".rds"
-  ))
+
+  create_extract_file(table_data, out)
+
+  # Check if the collated table exists
+  collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"),"/",
+                                table_data$table,".rds")
+  collated_table_exists <- tidypolis_io(io = "exists.file",
+                                        file_path = collated_table_name)
+
+  if (collated_table_exists) {
+    cli::cli_alert_info("Current table will be replaced in full as the full table was downloaded.")
+    tidypolis_io(obj = out, io = "write", file_path = paste0(
+      Sys.getenv("POLIS_DATA_CACHE"),
+      "/",
+      table_data$table,
+      ".rds"
+    ))
+  }
+
   update_polis_log(
-    .event = paste0(table_data$table, " data saved locally"),
+    .event = paste0(table_data$table, " data saved"),
     .event_type = "PROCESS"
   )
 
@@ -348,6 +383,22 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key"), parall
 
   if (api_key == "") {
     cli::cli_abort("Please run {.code init_tidypolis()} prior to pulling table data.")
+  }
+
+  # Check if extracts folder exist
+  if (!tidypolis_io(io = "exists.dir",
+                    file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts"))) {
+    # If not, create it
+    tidypolis_io(io = "create",
+                 file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts"))
+  }
+
+  # Check if table extract folder exist
+  extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts", table_data$table)
+
+  if (!tidypolis_io(io = "exists.dir", file_path = extract_table_folder)) {
+    # If not, create it
+    tidypolis_io(io = "create", file_path = extract_table_folder)
   }
 
   base_url <- "https://extranet.who.int/polis/api/v2/"
