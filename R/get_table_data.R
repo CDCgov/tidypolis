@@ -26,7 +26,7 @@ collate_file_extracts <- function(table_data) {
     dest <- tempdir()
     local_pq <- file.path(dest, table_data$table)
     AzureStor::storage_multidownload(sirfunctions::get_azure_storage_connection(),
-                                     src = paste0(extract_table_folder, "/*"),
+                                     src = paste0("GID/PEB/SIR/", extract_table_folder, "/*"),
                                      dest = local_pq,
                                      recursive = TRUE,
                                      overwrite = TRUE)
@@ -60,6 +60,8 @@ create_extract_file <- function(table_data, extract) {
 
   # Add extract to the extract table folder
   utc_time_stamp <- as.POSIXct(Sys.time(), tz = "UTC")
+  utc_time_stamp <- format(utc_time_stamp, "%Y%m%dT%H%M%SZ")
+
   extract_name <- paste0(utc_time_stamp,"_", table_data$table, ".parquet")
   extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts", table_data$table)
   tidypolis_io(extract, "write", file.path(extract_table_folder, extract_name))
@@ -125,6 +127,26 @@ get_full_table <- function(id_error, table_data) {
 #'
 update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
+  # If there's a collated RDS file but the extracts folder is empty,
+  # create an extract for it.
+  collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/", table_data$table, ".rds")
+  extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts", table_data$table)
+  extract_table_files <-  tidypolis_io(io = "list", file_path = extract_table_folder)
+  collated_table_exists <- tidypolis_io(io = "exists.file", file_path = collated_table_name)
+
+  if (length(extract_table_files) == 0 && collated_table_exists) {
+
+    utc_time_stamp <- as.POSIXct(Sys.time(), tz = "UTC")
+    utc_time_stamp <- format(utc_time_stamp, "%Y%m%dT%H%M%SZ")
+    old_cache <- tidypolis_io(io = "read", file_path = collated_table_name)
+    extract_name <- file.path(extract_table_folder, paste0(utc_time_stamp,
+                                                           "_", table_data$table,
+                                                           "_from_prev_cache.parquet"))
+
+    tidypolis_io(old_cache, io = "write", file_path = extract_name)
+
+  }
+
   time_modifier <- paste0(
     "&$filter=",
     table_data$polis_update_id,
@@ -132,7 +154,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
     sub(" ", "T", as.character(table_data$polis_update_value)), "Z")
 
   time_modifier <- gsub(" ", "+", time_modifier)
-    table_size <- get_table_size(.table = table_data$table, extra_filter = time_modifier)
+  table_size <- get_table_size(.table = table_data$table, extra_filter = time_modifier)
 
     if (table_size == 0) {
       cli::cli_alert_success("No new records. Skipping download.")
@@ -165,7 +187,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
     )
 
     days_interval <- ifelse(parallel_calls, 7, NULL)
-    urls <- create_table_urls(url, table_data, days_interval)
+    urls <- create_table_urls(table_url, table_data, days_interval)
 
     cli::cli_process_start("Downloading data")
     out <- call_urls(urls)
@@ -181,8 +203,6 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
       .event_type = "INFO"
     )
 
-    create_extract_file(table_data, out)
-
     cli::cli_process_done()
 
     # check ids and make list of ids to be deleted
@@ -192,16 +212,16 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
     # load in cache
     cli::cli_process_start("Loading existing cache")
-    collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/",
-                                  table_data$table, ".rds")
 
-    old_cache <- tidypolis_io(io = "read", file_path = collated_table_name)
+    old_cache <- collate_file_extracts(table_data)
 
     cli::cli_process_done()
 
+    # Create extract for new pull
+    create_extract_file(table_data, out)
+
     old_cache_n <- nrow(old_cache)
-    new_data_ids_in_old_cache <-
-      sum(dplyr::pull(out[table_data$polis_id]) %in% dplyr::pull(old_cache[table_data$polis_id]))
+    new_data_ids_in_old_cache <- sum(dplyr::pull(out[table_data$polis_id]) %in% dplyr::pull(old_cache[table_data$polis_id]))
     new_data_ids <- table_size - new_data_ids_in_old_cache
     deleted_ids <- dplyr::pull(old_cache[table_data$polis_id])[!dplyr::pull(old_cache[table_data$polis_id]) %in% ids] # ids contain all the ids available
 
@@ -425,6 +445,10 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 #' @export
 get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key"), parallel_calls = TRUE) {
 
+  base_url <- "https://extranet.who.int/polis/api/v2/"
+  table_data <- get_polis_cache(.table = .table)
+  table_url <- paste0(base_url, table_data$endpoint)
+
   if (api_key == "") {
     cli::cli_abort("Please run {.code init_tidypolis()} prior to pulling table data.")
   }
@@ -444,10 +468,6 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key"), parall
     # If not, create it
     tidypolis_io(io = "create", file_path = extract_table_folder)
   }
-
-  base_url <- "https://extranet.who.int/polis/api/v2/"
-  table_data <- get_polis_cache(.table = .table)
-  table_url <- paste0(base_url, table_data$endpoint)
 
   # check if ID API works for key files
   api_url <- paste0( base_url, table_data$endpoint, "?$top=1&$select=",

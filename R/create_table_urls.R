@@ -93,7 +93,7 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = NULL) {
 #' Create URLs for a table to assist in parallelization. Each table will need to be
 #' segmented based on their structure.
 #'
-#' @param url `str` Base url to be queried.
+#' @param api_url `str` Base url to be queried.
 #' @param table_data `tibble` One row tibble with the data for a specific table.
 #' @param days_intervals `int` Number of days for each interval. If set to `NULL`, then
 #' the request will not be chunked.
@@ -102,7 +102,7 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = NULL) {
 #'
 #' @returns `str` Array of URLs to be used in [call_urls()].
 #' @keywords internal
-create_table_urls <- function(url, table_data, days_intervals = 7) {
+create_table_urls <- function(api_url, table_data, days_intervals = 7) {
 
   with_update_col <- c("virus", "case", "human_specimen", "environmental_sample",
                        "activity", "sub_activity", "population")
@@ -110,7 +110,7 @@ create_table_urls <- function(url, table_data, days_intervals = 7) {
 
   if (is.null(days_intervals)) {
 
-    return(url)
+    return(api_url)
 
   } else if (with_update_date) {
 
@@ -124,7 +124,7 @@ create_table_urls <- function(url, table_data, days_intervals = 7) {
       date_intervals <- week_cuts_api("2000-01-01T00:00:00Z", table_data$polis_update_id, 365)
     }
 
-    urls <- paste0(url, "?$filter=", date_intervals)
+    urls <- paste0(api_url, "?$filter=", date_intervals)
     urls <- gsub(" ", "+", urls)
     return(urls)
   } else {
@@ -132,7 +132,7 @@ create_table_urls <- function(url, table_data, days_intervals = 7) {
     # lack an updated date. However, they are relatively small so we will not be using any
     # date slicing
     cli::cli_alert_info("The table has no updated date field. Full table download required.")
-    return(url)
+    return(api_url)
   }
 
 }
