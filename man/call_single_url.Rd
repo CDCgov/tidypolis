@@ -4,7 +4,12 @@
 \alias{call_single_url}
 \title{Call single URL}
 \usage{
-call_single_url(url, api_key = Sys.getenv("POLIS_API_KEY"), times = 10)
+call_single_url(
+  url,
+  api_key = Sys.getenv("POLIS_API_KEY"),
+  times = 10,
+  diagnostics = FALSE
+)
 }
 \arguments{
 \item{url}{\code{str} Single url.}
@@ -12,6 +17,8 @@ call_single_url(url, api_key = Sys.getenv("POLIS_API_KEY"), times = 10)
 \item{api_key}{\code{str} validated API key.}
 
 \item{times}{\code{int} Number of times to attempt connection with API.}
+
+\item{diagnostics}{\code{logical} Logging messages to see if calls are happening.}
 }
 \value{
 \code{tibble} Data from the response.

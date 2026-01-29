@@ -9,6 +9,7 @@
 #' @param url `str` Single url.
 #' @param api_key `str` validated API key.
 #' @param times `int` Number of times to attempt connection with API.
+#' @param diagnostics `logical` Logging messages to see if calls are happening.
 #' @returns `tibble` Data from the response.
 #' @export
 #' @examples
@@ -18,7 +19,8 @@
 #'
 call_single_url <- function(url,
                             api_key = Sys.getenv("POLIS_API_KEY"),
-                            times = 10) {
+                            times = 10,
+                            diagnostics = FALSE) {
   # disable SSL Mode
   httr::set_config(httr::config(ssl_verifypeer = 0L))
 
@@ -49,6 +51,18 @@ call_single_url <- function(url,
     out <- jsonlite::fromJSON(rawToChar(response$content))
     value <- dplyr::bind_rows(value, dplyr::as_tibble(out$value))
     nextLink <- out$`@odata.nextLink`
+
+    has_skip_token <- stringr::str_detect(nextLink, "skiptoken")
+
+    if (!has_skip_token) {
+      cli::cli_abort(paste0("The nextLink URL doesn't contain a skip token.",
+                            " Note that as of POLIS API v3.0.0, the skip parameter is deprecated.",
+                            " Please contact the POLIS team at polis@who.int."))
+    }
+
+    if (diagnostics) {
+      cli::cli_alert_info("Success, moving to next page...")
+    }
   }
 
   return(value)
