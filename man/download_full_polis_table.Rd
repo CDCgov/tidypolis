@@ -4,12 +4,14 @@
 \alias{download_full_polis_table}
 \title{Download the full table from POLIS}
 \usage{
-download_full_polis_table(table_data, table_url)
+download_full_polis_table(table_data, table_url, parallel_calls = TRUE)
 }
 \arguments{
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
 
 \item{table_url}{\code{str} URL of the endpoint for the specific table.}
+
+\item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
 }
 \value{
 \code{NULL} upon success.

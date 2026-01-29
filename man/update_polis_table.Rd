@@ -4,12 +4,14 @@
 \alias{update_polis_table}
 \title{Update the POLIS table}
 \usage{
-update_polis_table(table_data, table_url)
+update_polis_table(table_data, table_url, parallel_calls = TRUE)
 }
 \arguments{
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
 
 \item{table_url}{\code{str} URL of the endpoint for the specific table.}
+
+\item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
 }
 \value{
 \code{NULL}

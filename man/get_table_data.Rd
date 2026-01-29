@@ -4,13 +4,19 @@
 \alias{get_table_data}
 \title{Request data for single table in POLIS}
 \usage{
-get_table_data(.table, api_key = Sys.getenv("POLIS_API_Key"))
+get_table_data(
+  .table,
+  api_key = Sys.getenv("POLIS_API_Key"),
+  parallel_calls = TRUE
+)
 }
 \arguments{
 \item{.table}{\code{str} Name of the table to retrieve. Valid values include cache, virus, case,
 human_specimen, environmental_sample, activity, sub_activity, lqas, im, population, geography.}
 
 \item{api_key}{\code{str} API Key. Defaults to the value of the global env variable POLIS_API_KEY.}
+
+\item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
 }
 \value{
 \code{NULL} upon success.

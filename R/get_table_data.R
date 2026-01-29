@@ -52,11 +52,12 @@ get_full_table <- function(id_error, table_data) {
 #'
 #' @param table_data `tibble` One row tibble with the data for a specific table.
 #' @param table_url `str` URL of the endpoint for the specific table.
+#' @inheritParams get_table_data
 #'
 #' @returns `NULL`
 #' @keywords internal
 #'
-update_polis_table <- function(table_data, table_url) {
+update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
   time_modifier <- paste0(
     "&$filter=",
@@ -97,7 +98,8 @@ update_polis_table <- function(table_data, table_url) {
       .event_type = "INFO"
     )
 
-    urls <- create_table_urls(table_url, table_data, NULL) # disable chunking until issues with POLIS resolves
+    day_intervals <- ifelse(parallel_calls, 7, NULL)
+    urls <- create_table_urls(url, table_data, days_intervals)
 
     cli::cli_process_start("Downloading data")
     out <- call_urls(urls)
@@ -115,7 +117,7 @@ update_polis_table <- function(table_data, table_url) {
 
     # check ids and make list of ids to be deleted
     cli::cli_process_start("Getting table Ids")
-    ids <- get_table_ids(table_data)
+    ids <- get_table_ids(table_data, parallel_calls = parallel_calls)
     cli::cli_process_done()
 
     # load in cache
@@ -244,12 +246,14 @@ update_polis_table <- function(table_data, table_url) {
 #' @returns `NULL` upon success.
 #' @keywords internal
 #'
-download_full_polis_table <- function(table_data, table_url) {
+download_full_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
   table_size <- get_table_size(.table = table_data$table)
   cli::cli_alert_info(paste0("Getting ready to download ", table_size, " new rows of data!"))
 
   # Create table URLs here; where to shard will depend on the table
+  day_intervals <- ifelse(parallel_calls, 365, NULL)
+  urls <- create_table_urls(table_url, table_data, days_intervals)
 
   cli::cli_process_start("Downloading data")
   out <- call_urls(urls)
@@ -313,6 +317,7 @@ download_full_polis_table <- function(table_data, table_url) {
 #' @param .table `str` Name of the table to retrieve. Valid values include cache, virus, case,
 #' human_specimen, environmental_sample, activity, sub_activity, lqas, im, population, geography.
 #' @param api_key `str` API Key. Defaults to the value of the global env variable POLIS_API_KEY.
+#' @param parallel_calls `logical` Whether to obtain data in parallel, or sequentially. Defaults to `TRUE`.
 #' @returns `NULL` upon success.
 #' @examples
 #' \dontrun{
@@ -320,7 +325,7 @@ download_full_polis_table <- function(table_data, table_url) {
 #' get_table_data("virus")
 #' }
 #' @export
-get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key")) {
+get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key"), parallel_calls = TRUE) {
 
   if (api_key == "") {
     cli::cli_abort("Please run {.code init_tidypolis()} prior to pulling table data.")
@@ -355,9 +360,9 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key")) {
 
 
   if (full_dl) {
-    download_full_polis_table(table_data, table_url)
+    download_full_polis_table(table_data, table_url, parallel_calls)
   } else {
-    update_polis_table(table_data, table_url)
+    update_polis_table(table_data, table_url, parallel_calls)
   }
 
   return(NULL)
