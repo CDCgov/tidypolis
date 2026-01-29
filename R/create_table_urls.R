@@ -108,7 +108,11 @@ create_table_urls <- function(url, table_data, days_intervals = 7) {
                        "activity", "sub_activity", "population")
   with_update_date <- ifelse(table_data$table %in% with_update_col, TRUE, FALSE)
 
-  if (with_update_date) {
+  if (is.null(days_intervals)) {
+
+    return(url)
+
+  } else if (with_update_date) {
 
     update_date <- table_data$polis_update_value
 
@@ -116,15 +120,8 @@ create_table_urls <- function(url, table_data, days_intervals = 7) {
       # Download from last update date
       date_intervals <- week_cuts_api(update_date, table_data$polis_update_id , days_intervals)
     } else {
-      # Download all data in the table beginning from 2000-01-01
-      # since no last sync data
-      # If days intervals is not null, change to 365.
-      if (!is.null(days_intervals)) {
-        full_pull <- 365
-      } else {
-        full_pull <- NULL
-      }
-      date_intervals <- week_cuts_api("2000-01-01T00:00:00Z", table_data$polis_update_id, full_pull)
+      # Download starting from 2000
+      date_intervals <- week_cuts_api("2000-01-01T00:00:00Z", table_data$polis_update_id, 365)
     }
 
     urls <- paste0(url, "?$filter=", date_intervals)
@@ -134,6 +131,7 @@ create_table_urls <- function(url, table_data, days_intervals = 7) {
     # IM and LQAS are the tables that need to be downloaded in full because they
     # lack an updated date. However, they are relatively small so we will not be using any
     # date slicing
+    cli::cli_alert_info("The table has no updated date field. Full table download required.")
     return(url)
   }
 
