@@ -1,5 +1,48 @@
 # Private functions ----
 
+#' Collate extracts into one table
+#'
+#' @description
+#' This function collates the extracts into one table.
+#'
+#' @inheritParams update_polis_cache
+#'
+#' @returns `conn` A parquet connection.
+#' @keywords internal
+#'
+collate_file_extracts <- function(table_data) {
+  extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                    "raw_extracts", table_data$table)
+
+  file_extracts <- tidypolis_io(io = "list", file_path = extract_table_folder)
+
+  if (length(file_extracts) == 0) {
+    cli::cli_abort("No table extracts to collate!")
+  }
+
+  if (as.logical(Sys.getenv("POLIS_EDAV_FLAG"))) {
+
+    # Download files locally in the temp directory first
+    dest <- tempdir()
+    local_pq <- file.path(dest, table_data$table)
+    AzureStor::storage_multidownload(sirfunctions::get_azure_storage_connection(),
+                                     src = paste0(extract_table_folder, "/*"),
+                                     dest = local_pq,
+                                     recursive = TRUE,
+                                     overwrite = TRUE)
+
+    pq_connection <- arrow::open_dataset(local_pq)
+
+  } else {
+
+    pq_connection <- arrow::open_dataset(extract_table_folder)
+
+  }
+
+  return(pq_connection)
+
+}
+
 #' Create an extract file of an API table
 #'
 #' @description
@@ -18,7 +61,8 @@ create_extract_file <- function(table_data, extract) {
   # Add extract to the extract table folder
   utc_time_stamp <- as.POSIXct(Sys.time(), tz = "UTC")
   extract_name <- paste0(utc_time_stamp,"_", table_data$table, ".parquet")
-  tidypolis_io(extract, "write", extract_name)
+  extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts", table_data$table)
+  tidypolis_io(extract, "write", file.path(extract_table_folder, extract_name))
 
 }
 
@@ -125,6 +169,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
     cli::cli_process_start("Downloading data")
     out <- call_urls(urls)
+
     update_polis_log(
       .event = paste0(
         "Downloaded ",
@@ -135,6 +180,9 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
       ),
       .event_type = "INFO"
     )
+
+    create_extract_file(table_data, out)
+
     cli::cli_process_done()
 
     # check ids and make list of ids to be deleted
@@ -144,20 +192,18 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
     # load in cache
     cli::cli_process_start("Loading existing cache")
-    old_cache <-
-      tidypolis_io(io = "read", file_path = paste0(
-        Sys.getenv("POLIS_DATA_CACHE"),
-        "/",
-        table_data$table,
-        ".rds"
-      ))
+    collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/",
+                                  table_data$table, ".rds")
+
+    old_cache <- tidypolis_io(io = "read", file_path = collated_table_name)
+
     cli::cli_process_done()
 
     old_cache_n <- nrow(old_cache)
     new_data_ids_in_old_cache <-
       sum(dplyr::pull(out[table_data$polis_id]) %in% dplyr::pull(old_cache[table_data$polis_id]))
     new_data_ids <- table_size - new_data_ids_in_old_cache
-    deleted_ids <- dplyr::pull(old_cache[table_data$polis_id])[!dplyr::pull(old_cache[table_data$polis_id]) %in% ids]
+    deleted_ids <- dplyr::pull(old_cache[table_data$polis_id])[!dplyr::pull(old_cache[table_data$polis_id]) %in% ids] # ids contain all the ids available
 
     cli::cli_h3(paste0("'", table_data$table, "'", " table data"))
     cli::cli_bullets(c(
@@ -202,8 +248,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
     old_cache <- old_cache |>
       dplyr::filter(get(table_data$polis_id) %in% ids)
 
-    # check for missed IDs, if IDs missed then redownload full table
-    # create ids table in order to filter
+    # check for missed IDs
     cli::cli_process_start("Checking for missed records in download")
     ids_table <- as.data.frame(ids)
     missed.id <- ids_table |>
@@ -225,11 +270,10 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
       request_missing_recs <- gsub(" ", "+", request_missing_recs)
 
       missing_epids_data <- call_single_url(request_missing_epids)
-
-      old_cache <- bind_and_reconcile(new_data = missing_epids_data, old_data = old_cache)
-      cli::cli_alert_success("Added missing records to the cache")
-
     }
+
+    old_cache <- bind_and_reconcile(new_data = missing_epids_data, old_data = old_cache)
+    cli::cli_alert_success("Added missing records to the cache")
 
     cli::cli_process_start("Updating cache log")
     update_polis_cache(
