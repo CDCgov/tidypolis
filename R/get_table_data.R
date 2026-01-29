@@ -212,7 +212,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
     cli::cli_process_start("Updating cache log")
     update_polis_cache(
       cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-      .table = .table,
+      .table = table_data$table,
       .nrow = nrow(old_cache),
       .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])))
     )
@@ -257,16 +257,35 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 
   cli::cli_process_start("Downloading data")
   out <- call_urls(urls)
-  update_polis_log(
-    .event = paste0(
+
+  if (nrow(out) != table_size) {
+    error_message <- paste0(
       "Downloaded ",
-      table_size,
+      nrow(out),
       " rows of ",
       table_data$table,
-      " data"
-    ),
-    .event_type = "INFO"
-  )
+      " data. However, expected to download ",
+      table_size," rows of data."
+    )
+
+    cli::cli_alert_danger(error_message)
+    update_polis_log(
+      .event = error_message,
+      .event_type = "ERROR"
+    )
+  } else {
+    update_polis_log(
+      .event = paste0(
+        "Downloaded ",
+        nrow(out),
+        " rows of ",
+        table_data$table,
+        " data"
+      ),
+      .event_type = "INFO"
+    )
+  }
+
   cli::cli_process_done()
 
   # update cache information
@@ -274,14 +293,14 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
   if (is.na(table_data$polis_update_id)) {
     update_polis_cache(
       cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-      .table = .table,
+      .table = table_data$table,
       .nrow = nrow(out),
       .update_val = NA
     )
   } else {
     update_polis_cache(
       cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-      .table = .table,
+      .table = table_data$table,
       .nrow = nrow(out),
       .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])), na.rm = T)
     )
