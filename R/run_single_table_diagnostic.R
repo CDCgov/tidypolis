@@ -12,28 +12,27 @@ run_single_table_diagnostic <- function(.table, key = Sys.getenv("POLIS_API_Key"
     # disable SSL Mode
     httr::set_config(httr::config(ssl_verifypeer = 0L))
 
-    id_url <- paste0(table_url, "?$select=", table_data$polis_id)
-
     tick <- Sys.time()
     data_return <- tryCatch(
-      call_single_url(table_url, times = 1),
+      call_single_url(paste0(table_url, "?$top=1000"), key, times = 1),
       error = function(cond) {
         return("Error")
       }
     )
     tock <- Sys.time()
 
-    data_time <- tock - tick
+    data_time <- round(tock - tick, 2)
 
     tick <- Sys.time()
+    id_url <- paste0(table_url, "?$select=", table_data$polis_id, "&$top=1000")
     id_return <- tryCatch(
-      call_single_url(id_url, times = 1),
+      call_single_url(id_url, key, times = 1),
       error = function(cond) {
         return("Error")
       }
     )
     tock <- Sys.time()
-    id_time <- tock - tick
+    id_time <- round(tock - tick, 2)
 
     return(
       dplyr::tibble(
