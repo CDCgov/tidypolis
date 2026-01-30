@@ -4,10 +4,10 @@
 \alias{create_table_urls}
 \title{Create table URLs}
 \usage{
-create_table_urls(url, table_data, days_intervals = 7)
+create_table_urls(api_url, table_data, days_intervals = 7)
 }
 \arguments{
-\item{url}{\code{str} Base url to be queried.}
+\item{api_url}{\code{str} Base url to be queried.}
 
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
 

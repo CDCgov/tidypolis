@@ -7,7 +7,7 @@
 get_table_ids(
   table_data,
   api_key = Sys.getenv("POLIS_API_KEY"),
-  parallel_calls = TRUE
+  parallel_calls = FALSE
 )
 }
 \arguments{
