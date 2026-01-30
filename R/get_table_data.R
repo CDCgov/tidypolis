@@ -129,13 +129,14 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
   # If there's a collated RDS file but the extracts folder is empty,
   # create an extract for it.
-  collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/", table_data$table, ".rds")
+  collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/", table_data$table, ".parquet")
   extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts", table_data$table)
   extract_table_files <-  tidypolis_io(io = "list", file_path = extract_table_folder)
   collated_table_exists <- tidypolis_io(io = "exists.file", file_path = collated_table_name)
 
   if (length(extract_table_files) == 0 && collated_table_exists) {
 
+    cli::cli_process_start("Converting previous data cache into a parquet extract")
     utc_time_stamp <- as.POSIXct(Sys.time(), tz = "UTC")
     utc_time_stamp <- format(utc_time_stamp, "%Y%m%dT%H%M%SZ")
     old_cache <- tidypolis_io(io = "read", file_path = collated_table_name)
@@ -144,7 +145,25 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
                                                            "_from_prev_cache.parquet"))
 
     tidypolis_io(old_cache, io = "write", file_path = extract_name)
+    cli::cli_process_done()
 
+    cli::cli_process_start("Archiving rds table")
+    rds_archive_exists <- tidypolis_io(io = "exists.dir",
+                                       file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                                             "rds_archive", table_data$table))
+    if (!rds_archive_exists) {
+      cli::cli_process_start(paste0("Creating RDS archive for: ", table_data$endpoint))
+      tidypolis_io(io = "create",
+                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                         "rds_archive", table_data$table))
+      cli::cli_process_done()
+    }
+
+    tidypolis_io(old_cache, "write", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                                  "rds_archive", table_data$table,
+                                                  paste0(table_data$table, ".rds")))
+    tidypolis_io(io = "delete", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                                      paste0(table_data$table, ".rds")))
   }
 
   time_modifier <- paste0(
@@ -290,28 +309,32 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
       request_missing_recs <- gsub(" ", "+", request_missing_recs)
 
       missing_epids_data <- call_single_url(request_missing_epids)
+
+      create_extract_file(table_data, missing_epids_data)
+      out <- dplyr::bind_rows(out, missing_epids_data)
+
     }
 
-    old_cache <- bind_and_reconcile(new_data = missing_epids_data, old_data = old_cache)
+    updated_cache <- bind_and_reconcile(new_data = missing_epids_data, old_data = old_cache)
     cli::cli_alert_success("Added missing records to the cache")
 
     cli::cli_process_start("Updating cache log")
     update_polis_cache(
       cache_file = Sys.getenv("POLIS_CACHE_FILE"),
       .table = table_data$table,
-      .nrow = nrow(old_cache),
+      .nrow = nrow(updated_cache),
       .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])))
     )
     cli::cli_process_done()
 
     cli::cli_process_start("Writing data cache")
     tidypolis_io(
-      obj = old_cache, io = "write",
+      obj = updated_cache, io = "write",
       file_path = paste0(
         Sys.getenv("POLIS_DATA_CACHE"),
         "/",
         table_data$table,
-        ".rds"
+        ".parquet"
       )
     )
 
@@ -400,7 +423,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 
   # Check if the collated table exists
   collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"),"/",
-                                table_data$table,".rds")
+                                table_data$table,".parquet")
   collated_table_exists <- tidypolis_io(io = "exists.file",
                                         file_path = collated_table_name)
 
@@ -410,7 +433,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
       Sys.getenv("POLIS_DATA_CACHE"),
       "/",
       table_data$table,
-      ".rds"
+      ".parquet"
     ))
   }
 
