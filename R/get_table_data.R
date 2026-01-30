@@ -241,6 +241,16 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
     ids <- get_table_ids(table_data)
     cli::cli_process_done()
 
+    # Get full size of the table and the table IDs
+    full_table_size <- get_table_size(table_data$table)
+
+    # Check to see if table size is equal to the number of IDs
+    if (full_table_size != length(ids)) {
+      cli::cli_process_start("Obtaining full table IDs in parallel missed some IDs. Re-running sequentially...")
+      ids <- get_table_ids(table_data, parallel_calls = FALSE)
+      cli::cli_process_done()
+    }
+
     # load in cache
     cli::cli_process_start("Loading existing cache")
 
