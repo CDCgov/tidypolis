@@ -5,9 +5,10 @@
 #'
 #' @param table_data `tibble` One row tibble with the associated table data.
 #' @param api_key `str` POLIS API Key.
+#' @param parallel_calls `str` Whether to get table IDs using parallel calls.
 #' @returns `str` A vector of IDs.
 #' @export
-get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY")) {
+get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), parallel_calls = TRUE) {
     cli::cli_process_start(paste0("Downloading ", table_data$table, " table IDs"))
 
     # disable SSL Mode
@@ -24,7 +25,10 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY")) {
         table_data$polis_id
       )
 
-    response <- call_single_url(api_url)
+    days_interval <- ifelse(parallel_calls, 365, 0)
+    urls <- create_table_urls(api_url, table_data, days_interval)
+    response <- call_urls(urls)
+
     ids <- response |> dplyr::pull(table_data$polis_id)
 
     cli::cli_process_done()
