@@ -28,8 +28,7 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = NULL) {
   }
 
   if (is.null(days_intervals)) {
-    return(paste0(update_col, " gt ", format(a, "%Y-%m-%dT%H:%M:%OS3Z"),
-                  "&$orderby=", update_col, " asc"))
+    return(paste0(update_col, " gt ", format(a, "%Y-%m-%dT%H:%M:%OS3Z")))
   }
 
   by <- lubridate::ddays(days_intervals)
@@ -67,17 +66,14 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = NULL) {
       update_col,
       " gt ", starts_str[-length(starts_str)],
       " and ",
-      update_col, " le ", ends_str[-length(ends_str)],
-      "&$orderby=", update_col, " asc"
-    )
+      update_col, " le ", ends_str[-length(ends_str)])
   )
 
   last_row <- dplyr::tibble(
     start = starts_str[length(starts_str)],
     end   = NA_character_,
     open_ended = TRUE,
-    interval   = paste0(update_col, " gt ", starts_str[length(starts_str)],
-                        "&$orderby=", update_col, " asc")
+    interval   = paste0(update_col, " gt ", starts_str[length(starts_str)])
   )
 
   full_cut <- dplyr::bind_rows(fixed_rows, last_row) |>
