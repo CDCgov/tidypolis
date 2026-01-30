@@ -58,14 +58,6 @@ call_single_url <- function(url,
     value <- dplyr::bind_rows(value, dplyr::as_tibble(out$value))
     nextLink <- out$`@odata.nextLink`
 
-    has_skip_token <- stringr::str_detect(nextLink, "skiptoken")
-
-    if (!has_skip_token) {
-      cli::cli_abort(paste0("The nextLink URL doesn't contain a skip token.",
-                            " Note that as of POLIS API v3.0.0, the skip parameter is deprecated.",
-                            " Please contact the POLIS team at polis@who.int."))
-    }
-
     if (diagnostics) {
       cli::cli_alert_info("Success, moving to next page...")
     }
