@@ -290,16 +290,20 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
       .event_type = "INFO"
     )
 
-    # update cache
-    old_cache <- old_cache |>
-      dplyr::filter(!get(table_data$polis_id) %in% dplyr::pull(out[table_data$polis_id]))
-    old_cache <- bind_and_reconcile(new_data = out, old_data = old_cache)
+    # Update cache
+    updated_cache <- bind_and_reconcile(out, old_cache |> collect())
 
-    # delete data that no longer exists in POLIS
-    old_cache <- old_cache |>
+    # Remove duplicates based on unique ID
+    updated_cache <- updated_cache |>
+      dplyr::arrange(dplyr::desc(get(table_data$polis_update_id))) |>
+      dplyr::distinct(get(table_data$polis_id), .keep_all = TRUE)
+
+    # Remove deleted data
+    updated_cache <- updated_cache |>
+      dplyr::mutate(dplyr::across(dplyr::any_of(table_data$polis_id), \(x) as.character(x))) |>
       dplyr::filter(get(table_data$polis_id) %in% ids)
 
-    # check for missed IDs
+    # Check for missed IDs
     cli::cli_process_start("Checking for missed records in download")
     ids_table <- as.data.frame(ids)
     missed.id <- ids_table |>
