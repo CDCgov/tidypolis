@@ -127,8 +127,8 @@ get_full_table <- function(id_error, table_data) {
 #'
 update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
-  # If there's a collated RDS file but the extracts folder is empty,
-  # create an extract for it.
+  # If there's a collated RDS file but the extracts folder is empty, create an extract for it.
+
   collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/", table_data$table, ".parquet")
   extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts", table_data$table)
   extract_table_files <-  tidypolis_io(io = "list", file_path = extract_table_folder)
@@ -238,7 +238,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
     # check ids and make list of ids to be deleted
     cli::cli_process_start("Getting table Ids")
-    ids <- get_table_ids(table_data)
+    ids <- get_table_ids(table_data, parallel_calls = FALSE)
     cli::cli_process_done()
 
     # Get full size of the table and the table IDs
@@ -246,9 +246,11 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
     # Check to see if table size is equal to the number of IDs
     if (full_table_size != length(ids)) {
+
       cli::cli_process_start("Obtaining full table IDs in parallel missed some IDs. Re-running sequentially...")
       ids <- get_table_ids(table_data, parallel_calls = FALSE)
       cli::cli_process_done()
+
     }
 
     # load in cache
@@ -310,7 +312,8 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
     # Remove deleted data
     updated_cache <- updated_cache |>
-      dplyr::mutate(dplyr::across(dplyr::any_of(table_data$polis_id), \(x) as.character(x))) |>
+      dplyr::mutate(dplyr::across(dplyr::any_of(table_data$polis_id),
+                                  \(x) as.character(x))) |>
       dplyr::filter(get(table_data$polis_id) %in% ids)
 
     # Check for missed IDs
@@ -341,7 +344,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
     }
 
-    updated_cache <- bind_and_reconcile(new_data = missing_epids_data, old_data = old_cache)
+    updated_cache <- bind_and_reconcile(missing_epids_data, updated_cache)
     cli::cli_alert_success("Added missing records to the cache")
 
     cli::cli_process_start("Updating cache log")
@@ -368,6 +371,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
       .event = paste0(table_data$table, " data saved locally"),
       .event_type = "PROCESS"
     )
+
     cli::cli_process_done()
 
   return(NULL)

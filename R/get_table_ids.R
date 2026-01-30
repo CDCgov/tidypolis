@@ -25,7 +25,8 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
         table_data$polis_id
       )
 
-    days_interval <- ifelse(parallel_calls, 365, 0)
+    days_interval <- ifelse(parallel_calls, 730, 0) # two years
+    table_data$polis_update_value = "2000-01-01T00:00:00Z"
     urls <- create_table_urls(api_url, table_data, days_interval)
     response <- call_urls(urls)
 
