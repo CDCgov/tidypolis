@@ -4,18 +4,12 @@
 \alias{get_table_ids}
 \title{Get the unique IDs for a particular POLIS table}
 \usage{
-get_table_ids(
-  table_data,
-  api_key = Sys.getenv("POLIS_API_KEY"),
-  parallel_calls = FALSE
-)
+get_table_ids(table_data, api_key = Sys.getenv("POLIS_API_KEY"))
 }
 \arguments{
 \item{table_data}{\code{tibble} One row tibble with the associated table data.}
 
 \item{api_key}{\code{str} POLIS API Key.}
-
-\item{parallel_calls}{\code{str} Whether to get table IDs using parallel calls.}
 }
 \value{
 \code{str} A vector of IDs.
