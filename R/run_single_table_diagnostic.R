@@ -1,0 +1,47 @@
+#' Run single table diagnostic
+#'
+#' @description Run single table diagnostic
+#' @param .table `str` table name
+#' @param key `str` POLIS API Key
+#' @returns tibble with diagnostic data
+run_single_table_diagnostic <- function(.table, key = Sys.getenv("POLIS_API_Key")) {
+    base_url <- "https://extranet.who.int/polis/api/v2/"
+    table_data <- get_polis_cache(.table = .table)
+    table_url <- paste0(base_url, table_data$endpoint)
+
+    # disable SSL Mode
+    httr::set_config(httr::config(ssl_verifypeer = 0L))
+
+    id_url <- paste0(table_url, "?$select=", table_data$polis_id)
+
+    tick <- Sys.time()
+    data_return <- tryCatch(
+      call_single_url(table_url, times = 1),
+      error = function(cond) {
+        return("Error")
+      }
+    )
+    tock <- Sys.time()
+
+    data_time <- tock - tick
+
+    tick <- Sys.time()
+    id_return <- tryCatch(
+      call_single_url(id_url, times = 1),
+      error = function(cond) {
+        return("Error")
+      }
+    )
+    tock <- Sys.time()
+    id_time <- tock - tick
+
+    return(
+      dplyr::tibble(
+        "table" = .table,
+        "data" = ifelse(is.data.frame(data_return), "Success", "Error"),
+        "data_time" = data_time,
+        "id" = ifelse(is.data.frame(id_return), "Success", "Error"),
+        "id_time" = id_time
+      )
+    )
+  }
