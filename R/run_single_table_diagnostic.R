@@ -1,9 +1,12 @@
 #' Run single table diagnostic
 #'
-#' @description Run single table diagnostic
-#' @param .table `str` table name
-#' @param key `str` POLIS API Key
-#' @returns tibble with diagnostic data
+#' @description
+#' Run diagnostics on a single API table. These are
+#'
+#' @param .table `str` Table name. Valid values are "virus", "case", "human_specimen",
+#' "environmental_sample", "activity", "sub_activity", "lqas", "im",  "population".
+#' @param key `str` POLIS API Key.
+#' @returns `tibble` Diagnostic data on whether data was successfully pulled from POLIS.
 run_single_table_diagnostic <- function(.table, key = Sys.getenv("POLIS_API_Key")) {
     base_url <- "https://extranet.who.int/polis/api/v2/"
     table_data <- get_polis_cache(.table = .table)
