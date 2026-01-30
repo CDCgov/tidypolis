@@ -146,24 +146,36 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 
     tidypolis_io(old_cache, io = "write", file_path = extract_name)
     cli::cli_process_done()
+  }
+
+  # Turn old RDS cache into parquet
+  rds_table_path <- file.path(Sys.getenv("POLIS_DATA_CACHE"), paste0(table_data$table, ".rds"))
+  rds_table_exists <- tidypolis_io(io = "exists.file",
+                                   file_path = rds_table_path)
+
+  if (rds_table_exists) {
 
     cli::cli_process_start("Archiving rds table")
     rds_archive_exists <- tidypolis_io(io = "exists.dir",
                                        file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
-                                                             "rds_archive", table_data$table))
+                                                             "rds_archive"))
+
     if (!rds_archive_exists) {
       cli::cli_process_start(paste0("Creating RDS archive for: ", table_data$endpoint))
-      tidypolis_io(io = "create",
-                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
-                                         "rds_archive", table_data$table))
-      cli::cli_process_done()
+
+    old_cache <- tidypolis_io(io = "read", file_path = rds_table_path)
+    tidypolis_io(old_cache, "write", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                                           "rds_archive",
+                                                           paste0(table_data$table, ".rds")))
+    tidypolis_io(old_cache, "write", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                                           paste0(table_data$table, ".parquet")))
+    tidypolis_io(io = "delete", file_path = rds_table_path)
+
+    rm(old_cache)
+    cli::cli_process_done()
+
     }
 
-    tidypolis_io(old_cache, "write", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
-                                                  "rds_archive", table_data$table,
-                                                  paste0(table_data$table, ".rds")))
-    tidypolis_io(io = "delete", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
-                                                      paste0(table_data$table, ".rds")))
   }
 
   time_modifier <- paste0(
