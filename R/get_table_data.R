@@ -129,7 +129,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
   # If there's a collated RDS file but the extracts folder is empty, create an extract for it.
 
-  collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/", table_data$table, output_format)
+  collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/", table_data$table, ".rds")
   extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts", table_data$table)
   extract_table_files <-  tidypolis_io(io = "list", file_path = extract_table_folder)
   collated_table_exists <- tidypolis_io(io = "exists.file", file_path = collated_table_name)
@@ -149,9 +149,8 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
   }
 
   # Turn old RDS cache into parquet
-  rds_table_path <- file.path(Sys.getenv("POLIS_DATA_CACHE"), paste0(table_data$table, ".rds"))
   rds_table_exists <- tidypolis_io(io = "exists.file",
-                                   file_path = rds_table_path)
+                                   file_path = collated_table_name)
 
   if (rds_table_exists) {
 
@@ -160,21 +159,25 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
                                        file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
                                                              "rds_archive"))
 
+    # If the rds archive folder doesn't exist, then create it
     if (!rds_archive_exists) {
-      cli::cli_process_start(paste0("Creating RDS archive for: ", table_data$endpoint))
+      tidypolis_io(io = "create",
+                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                         "rds_archive"))
+    }
 
-    old_cache <- tidypolis_io(io = "read", file_path = rds_table_path)
+    cli::cli_process_start(paste0("Creating RDS archive for: ", table_data$endpoint))
+
+    old_cache <- tidypolis_io(io = "read", file_path = collated_table_name)
     tidypolis_io(old_cache, "write", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
                                                            "rds_archive",
                                                            paste0(table_data$table, ".rds")))
     tidypolis_io(old_cache, "write", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
                                                            paste0(table_data$table, ".parquet")))
-    tidypolis_io(io = "delete", file_path = rds_table_path)
+    tidypolis_io(io = "delete", file_path = collated_table_name)
 
     rm(old_cache)
     cli::cli_process_done()
-
-    }
 
   }
 
@@ -226,7 +229,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     update_polis_log(
       .event = paste0(
         "Downloaded ",
-        table_size,
+        nrow(out),
         " rows of ",
         table_data$table,
         " data"
@@ -244,20 +247,40 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     # Get full size of the table and the table IDs
     full_table_size <- get_table_size(table_data$table)
 
-    # load in cache
+    # Load in cache
     cli::cli_process_start("Loading existing cache")
 
     old_cache <- collate_file_extracts(table_data)
+
+    # Deduplicate after collation
+
+    # Compute latest date per id (lazy until collect)
+    latest_dates <- old_cache |>
+      dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
+      summarize(updated_date = max(!!dplyr::sym(table_data$polis_id), na.rm = TRUE)) |>
+      dplyr::ungroup()
+
+    # Join back to get full rows that match the latest date
+    old_cache <- old_cache |>
+      dplyr::inner_join(latest_dates)
 
     cli::cli_process_done()
 
     # Create extract for new pull
     create_extract_file(table_data, out)
 
-    old_cache_n <- nrow(old_cache)
-    new_data_ids_in_old_cache <- sum(dplyr::pull(out[table_data$polis_id]) %in% dplyr::pull(old_cache[table_data$polis_id]))
+    old_cache_n <- old_cache |>
+      dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
+      collect() |>
+      nrow()
+    new_data_ids_in_old_cache <- sum(dplyr::pull(out[table_data$polis_id]) %in% dplyr::pull(old_cache |>
+                                                                                              dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
+                                                                                              collect()))
     new_data_ids <- table_size - new_data_ids_in_old_cache
-    deleted_ids <- dplyr::pull(old_cache[table_data$polis_id])[!dplyr::pull(old_cache[table_data$polis_id]) %in% ids] # ids contain all the ids available
+    deleted_ids <- setdiff(old_cache |>
+                             dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
+                             collect() |>
+                             dplyr::pull(!!dplyr::sym(table_data$polis_id)), ids) # ids contain all the ids available
 
     cli::cli_h3(paste0("'", table_data$table, "'", " table data"))
     cli::cli_bullets(c(
@@ -298,21 +321,23 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     # Remove duplicates based on unique ID
     updated_cache <- updated_cache |>
-      dplyr::arrange(dplyr::desc(get(table_data$polis_update_id))) |>
-      dplyr::distinct(get(table_data$polis_id), .keep_all = TRUE)
+      group_by(!!dplyr::sym(table_data$polis_id)) |>
+      slice_max(order_by = !!dplyr::sym(table_data$polis_update_id), n = 1, with_ties = FALSE) |>
+      ungroup()
 
     # Remove deleted data
     updated_cache <- updated_cache |>
       dplyr::mutate(dplyr::across(dplyr::any_of(table_data$polis_id),
                                   \(x) as.character(x))) |>
-      dplyr::filter(get(table_data$polis_id) %in% ids)
+      dplyr::filter(!!dplyr::sym(table_data$polis_id) %in% ids)
 
     # Check for missed IDs
     cli::cli_process_start("Checking for missed records in download")
-    ids_table <- as.data.frame(ids)
+    ids_table <- dplyr::tibble(ids)
     missed.id <- ids_table |>
       dplyr::filter(!ids %in% dplyr::pull(updated_cache[table_data$polis_id])) |>
-      dplyr::mutate(ids = as.character(ids))
+      dplyr::mutate(ids = as.character(ids)) |>
+      dplyr::distinct(ids)
     cli::cli_process_done()
 
     if (nrow(missed.id) != 0) {
@@ -325,19 +350,26 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
           " record(s) missing, downloading data from missed record(s)..."
         )
       )
-      request_missing_recs <- paste0(table_url, "?$filter=",table_data$polis_id,
-                                      " in ", "('", paste0(missed.id$ids, collapse = "','"), "')")
-      request_missing_recs <- gsub(" ", "+", request_missing_recs)
 
-      missing_epids_data <- call_single_url(request_missing_recs)
+      # Chunk in case we need to download > 100 at a time. POLIS seems to struggle
+      # with it.
+      chunks <- split(missed.id |> dplyr::select(ids), ceiling(seq_along(missed.id$ids) / 200))
+
+      missing_epids_data <- purrr::map(chunks, \(x) {
+        request_missing_recs <- paste0(table_url, "?$filter=",table_data$polis_id,
+                                       " in ", "('", paste0(x$ids, collapse = "','"), "')")
+        request_missing_recs <- gsub(" ", "+", request_missing_recs)
+
+        missing_epids_data <- call_single_url(request_missing_recs)
+      }, .progress = TRUE)
 
       create_extract_file(table_data, missing_epids_data)
       out <- dplyr::bind_rows(out, missing_epids_data)
 
-    }
+      updated_cache <- bind_and_reconcile(missing_epids_data, updated_cache)
+      cli::cli_alert_success("Added missing records to the cache")
 
-    updated_cache <- bind_and_reconcile(missing_epids_data, updated_cache)
-    cli::cli_alert_success("Added missing records to the cache")
+    }
 
     cli::cli_process_start("Updating cache log")
     update_polis_cache(
