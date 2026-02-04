@@ -2584,7 +2584,7 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Case")
   api_case_data <- s1_clean_case_table(
-    path = file.path(polis_data_folder, "case.rds"),
+    path = file.path(polis_data_folder, "case", output_format),
     crosswalk = crosswalk_data
   )
 
@@ -2602,7 +2602,7 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Environmental Samples")
   api_es_data <- s1_clean_es_table(
-    path = file.path(polis_data_folder, "environmental_sample.rds"),
+    path = file.path(polis_data_folder, "environmental_sample", output_format),
     crosswalk = crosswalk_data
   )
 
@@ -2620,7 +2620,7 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Virus")
   api_virus_data <- s1_clean_virus_table(
-    path = file.path(polis_data_folder, "virus.rds"),
+    path = file.path(polis_data_folder, "virus", output_format),
     crosswalk = crosswalk_data
   )
 
@@ -2638,8 +2638,8 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Activity")
   api_activity_data <- s1_clean_activity_table(
-    path = file.path(polis_data_folder, "activity.rds"),
-    subactivity_path = file.path(polis_data_folder, "sub_activity.rds"),
+    path = file.path(polis_data_folder, "activity", output_format),
+    subactivity_path = file.path(polis_data_folder, "sub_activity", output_format),
     crosswalk = crosswalk_data
   )
 
@@ -2657,7 +2657,7 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Sub-activity")
   api_subactivity_data <- s1_clean_subactivity_table(
-    file.path(polis_data_folder, "sub_activity.rds"),
+    file.path(polis_data_folder, "sub_activity", output_format),
     api_activity_data,
     crosswalk_data,
     long.global.dist.01
