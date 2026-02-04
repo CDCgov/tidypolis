@@ -4,7 +4,12 @@
 \alias{download_full_polis_table}
 \title{Download the full table from POLIS}
 \usage{
-download_full_polis_table(table_data, table_url, parallel_calls = TRUE)
+download_full_polis_table(
+  table_data,
+  table_url,
+  parallel_calls = TRUE,
+  output_format
+)
 }
 \arguments{
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
@@ -12,6 +17,8 @@ download_full_polis_table(table_data, table_url, parallel_calls = TRUE)
 \item{table_url}{\code{str} URL of the endpoint for the specific table.}
 
 \item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
+
+\item{output_format}{\code{str} Output format of the table. Defaults to parquet.}
 }
 \value{
 \code{NULL} upon success.

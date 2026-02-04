@@ -125,11 +125,11 @@ get_full_table <- function(id_error, table_data) {
 #' @returns `NULL`
 #' @keywords internal
 #'
-update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
+update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, output_format) {
 
   # If there's a collated RDS file but the extracts folder is empty, create an extract for it.
 
-  collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/", table_data$table, ".parquet")
+  collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"), "/", table_data$table, output_format)
   extract_table_folder <- file.path(Sys.getenv("POLIS_DATA_CACHE"), "raw_extracts", table_data$table)
   extract_table_files <-  tidypolis_io(io = "list", file_path = extract_table_folder)
   collated_table_exists <- tidypolis_io(io = "exists.file", file_path = collated_table_name)
@@ -311,7 +311,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
     cli::cli_process_start("Checking for missed records in download")
     ids_table <- as.data.frame(ids)
     missed.id <- ids_table |>
-      dplyr::filter(!ids %in% dplyr::pull(old_cache[table_data$polis_id]))
+      dplyr::filter(!ids %in% dplyr::pull(updated_cache[table_data$polis_id]))
     cli::cli_process_done()
 
     if (nrow(missed.id) != 0) {
@@ -376,7 +376,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
 #' @returns `NULL` upon success.
 #' @keywords internal
 #'
-download_full_polis_table <- function(table_data, table_url, parallel_calls = TRUE) {
+download_full_polis_table <- function(table_data, table_url, parallel_calls = TRUE, output_format) {
 
   table_size <- get_table_size(.table = table_data$table)
   cli::cli_alert_info(paste0("Getting ready to download ", table_size, " new rows of data!"))
@@ -444,7 +444,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 
   # Check if the collated table exists
   collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"),"/",
-                                table_data$table,".parquet")
+                                table_data$table, output_format)
   collated_table_exists <- tidypolis_io(io = "exists.file",
                                         file_path = collated_table_name)
 
@@ -454,7 +454,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
       Sys.getenv("POLIS_DATA_CACHE"),
       "/",
       table_data$table,
-      ".parquet"
+      output_format
     ))
   }
 
@@ -480,6 +480,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 #' human_specimen, environmental_sample, activity, sub_activity, lqas, im, population, geography.
 #' @param api_key `str` API Key. Defaults to the value of the global env variable POLIS_API_KEY.
 #' @param parallel_calls `logical` Whether to obtain data in parallel, or sequentially. Defaults to `TRUE`.
+#' @param output_format `str` Output format of the table. Defaults to parquet.
 #' @returns `NULL` upon success.
 #' @examples
 #' \dontrun{
@@ -487,7 +488,18 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 #' get_table_data("virus")
 #' }
 #' @export
-get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key"), parallel_calls = TRUE) {
+get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key"),
+                           parallel_calls = TRUE, output_format = "parquet") {
+
+  # ensure leading dot in output_format
+  if (!startsWith(output_format, ".")) {
+    output_format <- paste0(".", output_format)
+  }
+
+  # validate output_format
+  if (!output_format %in% c(".rds", ".rda", ".csv", ".parquet")) {
+    stop("Currently, only 'rds', 'rda', 'csv', and 'parquet' are supported.")
+  }
 
   base_url <- "https://extranet.who.int/polis/api/v2/"
   table_data <- get_polis_cache(.table = .table)
@@ -538,9 +550,9 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_Key"), parall
 
 
   if (full_dl) {
-    download_full_polis_table(table_data, table_url, parallel_calls)
+    download_full_polis_table(table_data, table_url, parallel_calls, output_format)
   } else {
-    update_polis_table(table_data, table_url, parallel_calls)
+    update_polis_table(table_data, table_url, parallel_calls, output_format)
   }
 
   return(NULL)

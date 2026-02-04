@@ -7,7 +7,8 @@
 get_table_data(
   .table,
   api_key = Sys.getenv("POLIS_API_Key"),
-  parallel_calls = TRUE
+  parallel_calls = TRUE,
+  output_format = "parquet"
 )
 }
 \arguments{
@@ -17,6 +18,8 @@ human_specimen, environmental_sample, activity, sub_activity, lqas, im, populati
 \item{api_key}{\code{str} API Key. Defaults to the value of the global env variable POLIS_API_KEY.}
 
 \item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
+
+\item{output_format}{\code{str} Output format of the table. Defaults to parquet.}
 }
 \value{
 \code{NULL} upon success.
