@@ -355,13 +355,13 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       # with it.
       chunks <- split(missed.id |> dplyr::select(ids), ceiling(seq_along(missed.id$ids) / 200))
 
-      missing_epids_data <- purrr::map(chunks, \(x) {
+      missing_epids_data <- purrr::map(1:length(chunks), \(x) {
         request_missing_recs <- paste0(table_url, "?$filter=",table_data$polis_id,
-                                       " in ", "('", paste0(x$ids, collapse = "','"), "')")
+                                       " in ", "('", paste0(chunks[[x]]$ids, collapse = "','"), "')")
         request_missing_recs <- gsub(" ", "+", request_missing_recs)
 
         missing_epids_data <- call_single_url(request_missing_recs)
-      }, .progress = TRUE)
+      }, .progress = TRUE) |> dplyr::bind_rows()
 
       create_extract_file(table_data, missing_epids_data)
       out <- dplyr::bind_rows(out, missing_epids_data)
