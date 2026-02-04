@@ -336,11 +336,11 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     ids_table <- dplyr::tibble(ids)
     missed.id <- ids_table |>
       dplyr::filter(!ids %in% dplyr::pull(updated_cache[table_data$polis_id])) |>
-      dplyr::mutate(ids = as.character(ids)) |>
       dplyr::distinct(ids)
     cli::cli_process_done()
 
     if (nrow(missed.id) != 0) {
+      missed.id.type <- ifelse(is.character(missed.id$ids), "character", "numeric")
 
       cli::cli_alert_info(
         paste0(
@@ -353,14 +353,21 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
       # Chunk in case we need to download > 100 at a time. POLIS seems to struggle
       # with it.
-      chunks <- split(missed.id |> dplyr::select(ids), ceiling(seq_along(missed.id$ids) / 200))
+      chunks <- split(missed.id |> dplyr::select(ids), ceiling(seq_along(missed.id$ids) / 100))
 
       missing_epids_data <- purrr::map(1:length(chunks), \(x) {
-        request_missing_recs <- paste0(table_url, "?$filter=",table_data$polis_id,
-                                       " in ", "('", paste0(chunks[[x]]$ids, collapse = "','"), "')")
-        request_missing_recs <- gsub(" ", "+", request_missing_recs)
 
+        if (missed.id.type == "character") {
+          request_missing_recs <- paste0(table_url, "?$filter=",table_data$polis_id,
+                                         " in ", "('", paste0(chunks[[x]]$ids, collapse = "','"), "')")
+        } else {
+          request_missing_recs <- paste0(table_url, "?$filter=",table_data$polis_id,
+                                         " in ", "(", paste0(chunks[[x]]$ids, collapse = ","), ")")
+        }
+
+        request_missing_recs <- gsub(" ", "%20", request_missing_recs)
         missing_epids_data <- call_single_url(request_missing_recs)
+
       }, .progress = TRUE) |> dplyr::bind_rows()
 
       create_extract_file(table_data, missing_epids_data)
