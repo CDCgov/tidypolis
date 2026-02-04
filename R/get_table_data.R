@@ -311,7 +311,8 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     cli::cli_process_start("Checking for missed records in download")
     ids_table <- as.data.frame(ids)
     missed.id <- ids_table |>
-      dplyr::filter(!ids %in% dplyr::pull(updated_cache[table_data$polis_id]))
+      dplyr::filter(!ids %in% dplyr::pull(updated_cache[table_data$polis_id])) |>
+      dplyr::pull(ids) |> as.character()
     cli::cli_process_done()
 
     if (nrow(missed.id) != 0) {
@@ -328,7 +329,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
                                       " in ", "('", paste0(missed.id, collapse = "','"), "')")
       request_missing_recs <- gsub(" ", "+", request_missing_recs)
 
-      missing_epids_data <- call_single_url(request_missing_epids)
+      missing_epids_data <- call_single_url(request_missing_recs)
 
       create_extract_file(table_data, missing_epids_data)
       out <- dplyr::bind_rows(out, missing_epids_data)
