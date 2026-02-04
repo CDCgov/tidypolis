@@ -386,6 +386,8 @@ get_polis_data <- function(type = "all", parallel_calls = TRUE) {
     }
 
     sapply(type, function(x) get_table_data(.table = x, parallel_calls = parallel_calls))
+  } else if (length(type) == 1 && type %in% valid_types) {
+    get_table_data(type)
   }
 
 }
