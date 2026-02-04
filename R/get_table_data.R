@@ -312,7 +312,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     ids_table <- as.data.frame(ids)
     missed.id <- ids_table |>
       dplyr::filter(!ids %in% dplyr::pull(updated_cache[table_data$polis_id])) |>
-      dplyr::pull(ids) |> as.character()
+      dplyr::mutate(ids = as.character(ids))
     cli::cli_process_done()
 
     if (nrow(missed.id) != 0) {
@@ -326,7 +326,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
         )
       )
       request_missing_recs <- paste0(table_url, "?$filter=",table_data$polis_id,
-                                      " in ", "('", paste0(missed.id, collapse = "','"), "')")
+                                      " in ", "('", paste0(missed.id$ids, collapse = "','"), "')")
       request_missing_recs <- gsub(" ", "+", request_missing_recs)
 
       missing_epids_data <- call_single_url(request_missing_recs)
