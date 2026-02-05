@@ -33,12 +33,12 @@ Imports:
     yaml,
     utils,
     lifecycle,
-    tools
+    tools,
+    arrow
 Suggests:
     httpuv,
     fs,
     stats,
-    arrow,
     AzureStor,
     testthat (>= 3.0.0),
     knitr,
