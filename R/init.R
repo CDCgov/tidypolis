@@ -441,21 +441,21 @@ freeze_polis_data <- function() {
 #' @description
 #' Create standard analytic datasets from raw POLIS data
 #'
-#' @param type `str` specify the type of preprocessing to complete
-#' @param who_region `str` optional WHO region to filter data
+#' @param type `str` Specify the type of preprocessing to complete
+#' @param who_region `str` Optional WHO region to filter data
 #'      Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.
 #'
-#' @param output_format `str` output_format to save files as.
+#' @param output_format `str` Output_format to save files as.
 #'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
-#'    'rds'.
+#'    'parquet'.
 #'
-#' @returns Analytic rds files
+#' @returns Analytic files.
 #' @examples
 #' \dontrun{
 #' preprocess_data(type = "cdc") # must run init_tidypolis to specify POLIS data location first
 #' }
 #' @export
-preprocess_data <- function(type = "cdc", who_region = NULL, output_format = "rds") {
+preprocess_data <- function(type = "cdc", who_region = NULL, output_format = "parquet") {
   types <- c("cdc")
   outputs <- c("rds", "rda", "csv", "parquet")
 

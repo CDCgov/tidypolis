@@ -1210,7 +1210,7 @@ check_missingness <- function(data,
 #' @param polis_folder `str` location of the POLIS data folder
 #' @param output_format `str` output_format to save files as.
 #'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
-#'    'rds'.
+#'    'parquet'.
 #' @param who_region `str` optional WHO region to filter data
 #'      Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.
 #' @param archive Logical. Whether to archive previous output directories
@@ -1224,7 +1224,7 @@ check_missingness <- function(data,
 #'
 preprocess_cdc <- function(polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
                            who_region = NULL,
-                           output_format = "rds",
+                           output_format = "parquet",
                            archive = TRUE,
                            keep_n_archives = Inf) {
   cli::cli_h1("Step 0/5: Set-up preprocessing environment")
