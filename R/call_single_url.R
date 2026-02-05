@@ -36,7 +36,8 @@ call_single_url <- function(url,
 
   if (response$status_code != 200) {
     cli::cli_alert_warning(paste0("The response has a status code of: ", response$status_code))
-    cli::cli_abort("Error in pulling data from API using the URL request.")
+    cli::cli_alert_warning("Error in pulling data from API using the URL request.")
+    return(NA)
   }
 
   out <- jsonlite::fromJSON(rawToChar(response$content))
