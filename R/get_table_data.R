@@ -378,6 +378,12 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     }
 
+    # Final de-dup step for the updated cache
+    updated_cache <- updated_cache |>
+      group_by(!!dplyr::sym(table_data$polis_id)) |>
+      slice_max(order_by = !!dplyr::sym(table_data$polis_update_id), n = 1, with_ties = FALSE) |>
+      ungroup()
+
     cli::cli_process_start("Updating cache log")
     update_polis_cache(
       cache_file = Sys.getenv("POLIS_CACHE_FILE"),
@@ -482,9 +488,9 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 
   create_extract_file(table_data, out)
 
-  # Check if the collated table exists
+  # Check if the RDS collated table exists
   collated_table_name <- paste0(Sys.getenv("POLIS_DATA_CACHE"),"/",
-                                table_data$table, output_format)
+                                table_data$table, ".rds")
   collated_table_exists <- tidypolis_io(io = "exists.file",
                                         file_path = collated_table_name)
 
