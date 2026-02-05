@@ -411,7 +411,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     cli::cli_process_done()
 
-  return(NULL)
+  invisible()
 
 }
 
@@ -495,6 +495,33 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
                                         file_path = collated_table_name)
 
   if (collated_table_exists) {
+    cli::cli_process_start("Archiving rds table")
+    rds_archive_exists <- tidypolis_io(io = "exists.dir",
+                                       file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                                             "rds_archive"))
+
+    # If the rds archive folder doesn't exist, then create it
+    if (!rds_archive_exists) {
+      tidypolis_io(io = "create",
+                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                         "rds_archive"))
+    }
+
+    cli::cli_process_start(paste0("Creating RDS archive for: ", table_data$endpoint))
+
+    old_cache <- tidypolis_io(io = "read", file_path = collated_table_name)
+    tidypolis_io(old_cache, "write", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                                           "rds_archive",
+                                                           paste0(table_data$table, ".rds")))
+
+    tidypolis_io(old_cache, "write", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                                           paste0(table_data$table, ".parquet")))
+
+    tidypolis_io(io = "delete", file_path = collated_table_name)
+
+    rm(old_cache)
+    cli::cli_process_done()
+  } else {
     cli::cli_alert_info("Current table will be replaced in full as the full table was downloaded.")
     tidypolis_io(obj = out, io = "write", file_path = paste0(
       Sys.getenv("POLIS_DATA_CACHE"),
@@ -511,6 +538,8 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 
   cli::cli_process_done()
   gc()
+
+  invisible()
 
 }
 
