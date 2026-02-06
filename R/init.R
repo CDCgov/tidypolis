@@ -100,7 +100,7 @@ init_tidypolis <- function(
       "Following required files not found in the misc folder: ",
       paste0(missing_files, collapse = ", ")
     ))
-    cli::cli_abort("Please request these files from the CDC PEB SIR Team")
+    cli::cli_alert_warning("Required files missing")
   } else {
     cli::cli_alert_success("All required files present!")
   }
