@@ -100,7 +100,7 @@ init_tidypolis <- function(
       "Following required files not found in the misc folder: ",
       paste0(missing_files, collapse = ", ")
     ))
-    cli::cli_alert_warning("Required files missing")
+    cli::cli_alert_abort("Required files missing")
   } else {
     cli::cli_alert_success("All required files present!")
   }
