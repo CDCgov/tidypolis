@@ -4183,7 +4183,7 @@ s2_standardize_dates <- function(data) {
           "case.date", "stool.date.sent.to.lab",
           "clinical.admitted.date", "followup.date"
         )),
-        ~ lubridate::ymd(as.Date(., tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")), quiet = TRUE)
+        ~ lubridate::ymd(as.Date(., tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")), quiet = TRUE)
       )
     ) |>
     dplyr::mutate(
