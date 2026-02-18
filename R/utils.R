@@ -4135,27 +4135,27 @@ s2_standardize_dates <- function(data) {
     ) |>
     dplyr::mutate(
       dateonset = lubridate::ymd(
-        as.Date(date.onset, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        as.Date(date.onset, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
         quiet = TRUE
       ),
       datenotify = lubridate::ymd(
-        as.Date(notification.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        as.Date(notification.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
         quiet = TRUE
       ),
       dateinvest = lubridate::ymd(
-        as.Date(investigation.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        as.Date(investigation.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
         quiet = TRUE
       ),
       datestool1 = lubridate::ymd(
-        as.Date(stool.1.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        as.Date(stool.1.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
         quiet = TRUE
       ),
       datestool2 = lubridate::ymd(
-        as.Date(stool.2.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        as.Date(stool.2.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
         quiet = TRUE
       ),
       followup.date = lubridate::ymd(
-        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
+        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
         quiet = TRUE
       ),
       yronset = lubridate::year(dateonset),
