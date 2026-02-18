@@ -257,8 +257,15 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     # Compute latest date per id (lazy until collect)
     latest_dates <- old_cache |>
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
-      summarize(updated_date = max(!!dplyr::sym(table_data$polis_id), na.rm = TRUE)) |>
+      summarize(updated_date = max(!!dplyr::sym(table_data$polis_update_id), na.rm = TRUE)) |>
       dplyr::ungroup()
+
+    # Rename the updated date column
+    latest_dates <- latest_dates |>
+      dplyr::collect() |>
+      dplyr::rename_with(recode,
+                    updated_date = table_data$polis_update_id)
+
 
     # Join back to get full rows that match the latest date
     old_cache <- old_cache |>
@@ -321,6 +328,8 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     # Remove duplicates based on unique ID
     updated_cache <- updated_cache |>
+      dplyr::mutate(dplyr::across(dplyr::any_of(table_data$polis_update_id),
+                                  \(x) lubridate::as_datetime(x))) |>
       group_by(!!dplyr::sym(table_data$polis_id)) |>
       slice_max(order_by = !!dplyr::sym(table_data$polis_update_id), n = 1, with_ties = FALSE) |>
       ungroup()
