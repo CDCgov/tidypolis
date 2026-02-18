@@ -1,5 +1,86 @@
 # Private functions ----
 
+#' Force compile an extract folder
+#'
+#' @param table_data `tibble` A one row tibble with table information
+#'
+#' @returns `tibble` Updated table cache, invisibly.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#'
+#' init_tidypolis(edav = T)
+#' cache <- get_polis_cache()
+#' force_compile_raw_extract(cache[2, ]) # this corresponds to the virus table_data
+#' }
+force_compile_raw_extract <- function(table_data) {
+
+  if (is.na(table_data$polis_update_id)) {
+    cli::cli_alert_info(paste0("Can't force compile ",
+                               table_data$table,
+                               " as the table is always fully downloaded."))
+
+    return(invisible())
+
+  } else {
+
+    # Perform deduplication
+    old_cache <- collate_file_extracts(table_data)
+    # Compute latest date per id (lazy until collect)
+    latest_dates <- old_cache |>
+      dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
+      summarize(updated_date = max(!!dplyr::sym(table_data$polis_update_id), na.rm = TRUE)) |>
+      dplyr::ungroup()
+
+    # Rename the updated date column
+    latest_dates <- latest_dates |>
+      dplyr::collect() |>
+      dplyr::rename_with(recode,
+                         updated_date = table_data$polis_update_id)
+
+    # Join back to get full rows that match the latest date
+    old_cache <- old_cache |>
+      dplyr::inner_join(latest_dates)
+
+    # Find deleted records
+    cli::cli_process_start("Getting table Ids")
+    ids <- get_table_ids(table_data, parallel_calls = FALSE)
+    cli::cli_process_done()
+
+    deleted_ids <- setdiff(old_cache |>
+                             dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
+                             collect() |>
+                             dplyr::pull(!!dplyr::sym(table_data$polis_id)), ids)
+
+    old_cache <- old_cache |>
+      dplyr::collect() |>
+      dplyr::mutate(dplyr::across(dplyr::any_of(table_data$polis_id),
+                                \(x) as.character(x))) |>
+      dplyr::filter(!!dplyr::sym(table_data$polis_id) %in% ids) |>
+      dplyr::distinct()
+
+    cli::cli_process_start("Writing data cache")
+    tidypolis_io(
+      obj = old_cache, io = "write",
+      file_path = paste0(
+        Sys.getenv("POLIS_DATA_CACHE"),
+        "/",
+        table_data$table,
+        ".parquet"
+      )
+    )
+    cli::cli_process_done()
+
+    cli::cli_alert_success("Recompiled POLIS table from raw_extract folder.")
+
+  }
+
+  invisible(old_cache)
+
+}
+
+
 #' Collate extracts into one table
 #'
 #' @description
@@ -389,9 +470,10 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     # Final de-dup step for the updated cache
     updated_cache <- updated_cache |>
-      group_by(!!dplyr::sym(table_data$polis_id)) |>
-      slice_max(order_by = !!dplyr::sym(table_data$polis_update_id), n = 1, with_ties = FALSE) |>
-      ungroup()
+      dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
+      dplyr::slice_max(order_by = !!dplyr::sym(table_data$polis_update_id), n = 1, with_ties = FALSE) |>
+      dplyr::ungroup() |>
+      dplyr::distinct()
 
     cli::cli_process_start("Updating cache log")
     update_polis_cache(
