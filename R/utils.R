@@ -4134,30 +4134,12 @@ s2_standardize_dates <- function(data) {
       admin2guid = admin.2.guid
     ) |>
     dplyr::mutate(
-      dateonset = lubridate::ymd(
-        as.Date(date.onset, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
-        quiet = TRUE
-      ),
-      datenotify = lubridate::ymd(
-        as.Date(notification.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
-        quiet = TRUE
-      ),
-      dateinvest = lubridate::ymd(
-        as.Date(investigation.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
-        quiet = TRUE
-      ),
-      datestool1 = lubridate::ymd(
-        as.Date(stool.1.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
-        quiet = TRUE
-      ),
-      datestool2 = lubridate::ymd(
-        as.Date(stool.2.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
-        quiet = TRUE
-      ),
-      followup.date = lubridate::ymd(
-        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")),
-        quiet = TRUE
-      ),
+      dateonset = lubridate::as_date(date.onset),
+      datenotify = lubridate::as_date(notification.date),
+      dateinvest = lubridate::as_date(investigation.date),
+      datestool1 = lubridate::as_date(stool.1.collection.date),
+      datestool2 = lubridate::as_date(stool.2.collection.date),
+      followup.date = lubridate::as_date(followup.date),
       yronset = lubridate::year(dateonset),
       yronset = dplyr::if_else(is.na(yronset),
         lubridate::year(datestool1), yronset
@@ -4183,7 +4165,7 @@ s2_standardize_dates <- function(data) {
           "case.date", "stool.date.sent.to.lab",
           "clinical.admitted.date", "followup.date"
         )),
-        ~ lubridate::ymd(as.Date(., tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d")), quiet = TRUE)
+        \(x)  lubridate::as_date(x)
       )
     ) |>
     dplyr::mutate(
@@ -4191,7 +4173,10 @@ s2_standardize_dates <- function(data) {
       casedate = case.date,
       stooltolabdate = stool.date.sent.to.lab,
       stooltoiclabdate = stool.date.sent.to.ic.lab,
-      clinicadmitdate = clinical.admitted.date
+      clinicadmitdate = clinical.admitted.date,
+      datecreated = lubridate::as_datetime(created.date),
+      datepublish = lubridate::as_datetime(publishdate),
+      dateupdated = lubridate::as_datetime(last.updated.date)
     )
 
   cli::cli_process_done()
