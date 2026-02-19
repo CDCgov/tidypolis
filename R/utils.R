@@ -4633,7 +4633,7 @@ s2_validate_classifications <- function(data, output_folder_name) {
                      dplyr::filter(cdc.classification.all == "none"),
                    io = "write",
                    file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
-                                         output_folder, "afp_epids_none_classification.parquet"))
+                                         output_folder_name, "afp_epids_none_classification.parquet"))
     }
   }
 
