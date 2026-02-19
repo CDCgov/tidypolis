@@ -4613,7 +4613,7 @@ s2_validate_classifications <- function(data, output_folder_name) {
     #flagged_to_polis <- c("MOZ-TET-TSA-22-006")
 
     # Remove known cases from consideration
-    epids <- epids[!epids %in% flagged_to_polis]
+    #epids <- epids[!epids %in% flagged_to_polis]
 
     # If unknown "none" classifications remain, raise an error
     if (length(epids) > 0) {
