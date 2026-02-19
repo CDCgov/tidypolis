@@ -3840,7 +3840,7 @@ s2_fully_process_afp_data <- function(polis_data_folder, polis_folder,
   )
 
   # Step 2g: Validate classifications
-  afp_validated <- s2_validate_classifications(data = afp_classified)
+  afp_validated <- s2_validate_classifications(data = afp_classified, output_folder_name)
   invisible(gc())
 
   # Step 2h: Validate and fix GUIDs
@@ -4561,6 +4561,7 @@ s2_classify_afp_cases <- function(data, startyr = 2020,
 #' are in a predefined list of cases that have been manually reviewed.
 #'
 #' @param data `tibble` A tibble containing AFP data with classification columns
+#' @param output_folde_name `str` Folder to output EPIDs with issues.
 #'
 #' @returns The filtered tibble with invalid classifications removed
 #'
@@ -4573,7 +4574,7 @@ s2_classify_afp_cases <- function(data, startyr = 2020,
 #' Known issues are filtered against a predefined whitelist
 #'
 #' @keywords internal
-s2_validate_classifications <- function(data) {
+s2_validate_classifications <- function(data, output_folder_name) {
   cli::cli_process_start(
     paste0(
       "Verifying that classifications in data line up with ",
@@ -4609,7 +4610,7 @@ s2_validate_classifications <- function(data) {
       dplyr::pull(epid)
 
     # List of cases already flagged to POLIS that can be skipped
-    flagged_to_polis <- c("MOZ-TET-TSA-22-006")
+    #flagged_to_polis <- c("MOZ-TET-TSA-22-006")
 
     # Remove known cases from consideration
     epids <- epids[!epids %in% flagged_to_polis]
@@ -4620,13 +4621,17 @@ s2_validate_classifications <- function(data) {
         "There is a 'none' classification, flag for POLIS ",
         "and get guidance on proper classification"
       ))
+      cli::cli_li(epids)
 
       update_polis_log(
         .event = "NONE classification found, must be manually addressed",
         .event_type = "ERROR"
       )
 
-      stop("Found 'none' classifications that must be addressed manually")
+      cli::cli_alert_info("Please see output afp_epids_none_classification.csv for details")
+      tidypolis_io(epids, io = "write",
+                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                         output_folder, "afp_epids_none_classification.csv"))
     }
   }
 
