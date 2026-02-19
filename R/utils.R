@@ -381,7 +381,7 @@ rename_via_crosswalk <- function(api_data,
   for (i in 1:nrow(crosswalk_sub1)) {
     api_name <- crosswalk_sub1$API_Name[i]
     web_name <- crosswalk_sub1$Web_Name[i]
-    if (!is.na(web_name) & web_name != "") {
+    if (!is.na(web_name) & web_name != "" & api_name %in% names(api_data)) {
       api_data <- api_data |>
         dplyr::rename({{ web_name }} := {{ api_name }})
     }
@@ -2947,12 +2947,12 @@ s1_clean_es_table <- function(path, crosswalk,
         "%Y-%m-%d"
     ), format = "%d-%m-%Y"))) |>
     dplyr::mutate(`Sample Id` = as.character(`Sample Id`)) |>
-    dplyr::select(c(
+    dplyr::select(any_of(c(
       crosswalk$Web_Name[crosswalk$Table %in% c("EnvSample") &
         !is.na(crosswalk$Web_Name)],
       crosswalk$API_Name[crosswalk$Table %in% c("EnvSample") &
         is.na(crosswalk$Web_Name)]
-    ))
+    )))
   cli::cli_process_done()
 
   rm(api_es_sub2)
@@ -4075,7 +4075,7 @@ s2_check_duplicated_epids <- function(data, polis_data_folder, output_folder_nam
     update_polis_log(
       .event = paste0(
         "Duplicate AFP cases output in ",
-        "duplicate_AFPcases_Polis within ", output_folder_name,
+        "duplicate_AFPcases_Polis within ", output_folder_name
       ),
       .event_type = "ALERT"
     )
