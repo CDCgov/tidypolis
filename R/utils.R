@@ -2947,7 +2947,7 @@ s1_clean_es_table <- function(path, crosswalk,
         "%Y-%m-%d"
     ), format = "%d-%m-%Y"))) |>
     dplyr::mutate(`Sample Id` = as.character(`Sample Id`)) |>
-    dplyr::select(any_of(c(
+    dplyr::select(dplyr::any_of(c(
       crosswalk$Web_Name[crosswalk$Table %in% c("EnvSample") &
         !is.na(crosswalk$Web_Name)],
       crosswalk$API_Name[crosswalk$Table %in% c("EnvSample") &
