@@ -4561,7 +4561,7 @@ s2_classify_afp_cases <- function(data, startyr = 2020,
 #' are in a predefined list of cases that have been manually reviewed.
 #'
 #' @param data `tibble` A tibble containing AFP data with classification columns
-#' @param output_folde_name `str` Folder to output EPIDs with issues.
+#' @param output_folder_name `str` Folder to output EPIDs with issues.
 #'
 #' @returns The filtered tibble with invalid classifications removed
 #'
