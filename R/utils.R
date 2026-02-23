@@ -933,14 +933,30 @@ create_response_vars <- function(pos,
   # bring in processed SIA data
   path <- tidypolis_io(io = "list", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"), output_folder_name), full_names = T)
 
+  sia <- NULL
+  sia_path <- path[grepl("sia_2000", path)]
+
+  if (length(sia_path) > 0) {
   tryCatch(
     {
       sia <- tidypolis_io(io = "read", file_path = path[grepl("sia_2000", path)])
     },
     error = \(e) {
-      cli::cli_abort("Please run Step 3 of preprocessing before Step 5.")
+      sia <- NULL
     }
   )
+
+  # If no SIA data, return pos unchanged with NA response variables
+  if (is.null(sia)) {
+    cli::cli_warn("No SIA file found.")
+    pos_with_nas <- pos |>
+      dplyr::mutate(
+        finished.responses = NA_real_,
+        planned.campaigns = NA_real_,
+        ipv.campaigns = NA_real_
+      )
+    return(pos_with_nas)
+  }
 
   sia.sub <- sia |>
     dplyr::select(
@@ -7989,6 +8005,8 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
     dplyr::filter(grepl(paste0("^(afp_linelist_2001-01-01).*(\\", output_format, ")$"), short_name)) |>
     dplyr::pull(name)
 
+  afp.01 <- NULL
+  if (length(afp.files.01) > 0) {
   tryCatch(
     {
       afp.01 <- lapply(afp.files.01, function(x) tidypolis_io(io = "read", file_path = x)) |>
@@ -7998,10 +8016,10 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
         dplyr::filter(dplyr::between(yronset, startyr, endyr))
     },
     error = \(e) {
-      cli::cli_abort("Please run Step 2 of preprocessing before Step 5.")
+      cli::cli_warn("Please run Step 2 of preprocessing before Step 5.")
     }
   )
-
+}
 
   non.afp.files.01 <- dplyr::tibble("name" = tidypolis_io(io = "list", file_path = file.path(polis_data_folder, output_folder_name), full_names = T)) |>
     dplyr::mutate(short_name = stringr::str_replace(name, paste0(polis_data_folder, "/", output_folder_name, "/"), "")) |>
@@ -8011,7 +8029,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
     ), short_name)) |>
     dplyr::pull(name)
 
-
+  non.afp.01 <- NULL
   if (output_folder_name == "Core_Ready_Files" ||
     length(non.afp.files.01) > 0) {
     tryCatch(
@@ -8025,7 +8043,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
           dplyr::filter(dplyr::between(yronset, startyr, endyr))
       },
       error = \(e) {
-        cli::cli_abort("Please run Step 2 of preprocessing before Step 5.")
+        cli::cli_warn("Non-AFP surveillance files found but could not be read")
       }
     )
   } else {
