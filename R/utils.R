@@ -1308,7 +1308,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
       crs = sf::st_crs(global.dist.01)
     )
 
-  global.dist.02 <- sf::st_make_valid(global.dist.01)
+  global.dist.02 <- global.dist.01
 
   # identify bad shape rows after make_valid
   check.dist.2 <- dplyr::as_tibble(sf::st_is_valid(global.dist.02))
@@ -2627,6 +2627,16 @@ process_spatial <- function(gdb_folder,
       )
   }
   cli::cli_process_done()
+
+  cli::cli_process_start("Validating geometries")
+
+  #Make geometries valid
+  global.ctry.01 <- sf::st_make_valid(global.ctry.01)
+  global.prov.01 <- sf::st_make_valid(global.prov.01)
+  global.dist.01 <- sf::st_make_valid(global.dist.01)
+
+  cli::cli_process_done()
+
 
   # identify sf var in global.ctry
   cli::cli_process_start("Country shapefile processing")
