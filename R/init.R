@@ -334,7 +334,12 @@ init_tidypolis <- function(
 #' get_polis_data() # must be run after using init_tidypolis and providing a valid API key.
 #' }
 #' @export
-get_polis_data <- function(type = "all", parallel_calls = TRUE) {
+get_polis_data <- function(type = "all",
+                           whoregion = "all",
+                           output_format = "parquet",
+                           start_year = NULL,
+                           end_year = NULL,
+                           parallel_calls = TRUE) {
 
   valid_types <- c("all", "virus", "case", "human_specimen",
                    "environmental_sample", "activity", "sub_activity", "lqas",
@@ -351,7 +356,11 @@ get_polis_data <- function(type = "all", parallel_calls = TRUE) {
       .event_type = "START"
     )
 
-    sapply(tables, function(x) get_table_data(.table = x))
+    sapply(tables, function(x) get_table_data(.table = x,
+                                              whoregion = whoregion,
+                                              output_format = output_format,
+                                              start_year = start_year,
+                                              end_year = end_year))
   } else if (length(type) == 1 && type == "pop") {
 
     update_polis_log(

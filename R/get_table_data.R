@@ -378,7 +378,14 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
       }, .progress = TRUE) |> dplyr::bind_rows()
 
+      # Fix date column type mismatch before binding
+      if ("VirusDate" %in% names(missing_epids_data)) {
+        missing_epids_data <- missing_epids_data |>
+          dplyr::mutate(VirusDate = as.Date(VirusDate))
+      }
+
       create_extract_file(table_data, missing_epids_data)
+
       out <- dplyr::bind_rows(out, missing_epids_data)
 
       updated_cache <- bind_and_reconcile(missing_epids_data, updated_cache)
@@ -572,7 +579,10 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
 #' get_table_data("virus")
 #' }
 #' @export
-get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_KEY"),
+get_table_data <- function(.table,
+                           whoregion = "all",
+                           start_date = NULL,
+                           end_date = NULL, api_key = Sys.getenv("POLIS_API_KEY"),
                            parallel_calls = TRUE, output_format = "parquet") {
 
   # ensure leading dot in output_format
@@ -588,6 +598,25 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_KEY"),
   base_url <- "https://extranet.who.int/polis/api/v2/"
   table_data <- get_polis_cache(.table = .table)
   table_url <- paste0(base_url, table_data$endpoint)
+
+  # Add filters for whoregion and dates
+  filters <- c()
+
+  if (whoregion != "all") {
+    filters <- c(filters, paste0("WHORegion eq '", whoregion, "'"))
+  }
+
+  if (!is.null(start_date)) {
+    filters <- c(filters, paste0("ReportDate ge ", start_date))  # Adjust column name as needed
+  }
+
+  if (!is.null(end_date)) {
+    filters <- c(filters, paste0("ReportDate le ", end_date))  # Adjust column name as needed
+  }
+
+  if (length(filters) > 0) {
+    table_url <- paste0(table_url, "?$filter=", paste(filters, collapse = " and "))
+  }
 
   if (api_key == "") {
     cli::cli_abort("Please run {.code init_tidypolis()} prior to pulling table data.")
