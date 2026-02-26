@@ -4,12 +4,10 @@
 \alias{s2_validate_classifications}
 \title{Validate case classifications in AFP data}
 \usage{
-s2_validate_classifications(data, output_folder_name)
+s2_validate_classifications(data)
 }
 \arguments{
 \item{data}{\code{tibble} A tibble containing AFP data with classification columns}
-
-\item{output_folder_name}{\code{str} Folder to output EPIDs with issues.}
 }
 \value{
 The filtered tibble with invalid classifications removed

@@ -4,20 +4,20 @@
 \alias{preprocess_data}
 \title{Preprocess data retrieved from POLIS}
 \usage{
-preprocess_data(type = "cdc", who_region = NULL, output_format = "parquet")
+preprocess_data(type = "cdc", who_region = NULL, output_format = "rds")
 }
 \arguments{
-\item{type}{\code{str} Specify the type of preprocessing to complete}
+\item{type}{\code{str} specify the type of preprocessing to complete}
 
-\item{who_region}{\code{str} Optional WHO region to filter data
+\item{who_region}{\code{str} optional WHO region to filter data
 Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.}
 
-\item{output_format}{\code{str} Output_format to save files as.
+\item{output_format}{\code{str} output_format to save files as.
 Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
-'parquet'.}
+'rds'.}
 }
 \value{
-Analytic files.
+Analytic rds files
 }
 \description{
 Create standard analytic datasets from raw POLIS data

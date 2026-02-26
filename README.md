@@ -42,7 +42,7 @@ used by the SIR team.
 ## Release Schedule
 
 -   Please see the
-    [Releases](https://github.com/CDCGov/tidypolis/releases)
+    [Releases](https://github.com/nish-kishore/tidypolis/releases)
     page for specifics on previous releases.
 
 ## Contact 

@@ -156,7 +156,7 @@ init_tidypolis <- function(
         "RefData", "Population"
       ),
       "polis_id" = c(
-        NA, "VirusId", "CaseManualEditId", "SpecimenId", "EnviroSampleManualEditId", "SubActivityId", "SubActivityByAdmin2Id",
+        NA, "VirusId", "EPID", "SpecimenId", "EnviroSampleManualEditId", "SubActivityId", "SubActivityByAdmin2Id",
         "LqasId", "ImId", "FK_GeoplaceId", "PlaceId", NA, NA, NA, "Id"
       ),
       "polis_update_id" = c(
@@ -322,25 +322,17 @@ init_tidypolis <- function(
 
 #' Manager function to get and update POLIS data
 #'
-#' @description
-#' This function iterates through all tables and loads POLIS data. It
+#' @description This function iterates through all tables and loads POLIS data. It
 #' checks to ensure that new rows are created, data are updated accordingly and
 #' deleted rows are reflected in the local system.
-#' @param type `str` Choose to download population data ("pop") or all other data. Defaults to "all",
-#' which includes Virus, Case, Human Specimen, Environmental Sample, Activity, Subactivity, LQAS, and IM.
-#' @param parallel_calls `str` Whether to get table IDs using parallel calls. Defaults to `TRUE`.
+#' @param type choose to download population data ("pop") or all other data. Default's to "all"
 #' @examples
 #' \dontrun{
-#' get_polis_data() # must be run after using init_tidypolis and providing a valid API key.
+#' get_polis_data() # must be run after using init_tidypolis and providing a valid API key
 #' }
 #' @export
-get_polis_data <- function(type = "all", parallel_calls = TRUE) {
-
-  valid_types <- c("all", "virus", "case", "human_specimen",
-                   "environmental_sample", "activity", "sub_activity", "lqas",
-                   "im", "pop")
-
-  if (length(type) == 1 && type == "all") {
+get_polis_data <- function(type = "all") {
+  if (type == "all") {
     tables <- c(
       "virus", "case", "human_specimen", "environmental_sample",
       "activity", "sub_activity", "lqas", "im"
@@ -352,8 +344,9 @@ get_polis_data <- function(type = "all", parallel_calls = TRUE) {
     )
 
     sapply(tables, function(x) get_table_data(.table = x))
-  } else if (length(type) == 1 && type == "pop") {
+  }
 
+  if (type == "pop") {
     update_polis_log(
       .event = "Start POLIS pop download",
       .event_type = "START"
@@ -362,34 +355,10 @@ get_polis_data <- function(type = "all", parallel_calls = TRUE) {
     get_table_data(.table = "pop")
 
     update_polis_log(
-      .event = "POLIS Pop file downloaded",
+      .event = "POLIS Pop file donwloaded",
       .event_type = "END"
     )
-  } else if (length(type) > 1) {
-    invalid <- setdiff(type, valid_types)
-
-    if (length(invalid) > 0) {
-      cli::cli_alert_info("The following type passed are invalid: ")
-      cli::cli_li(invalid)
-    }
-
-    valid <- type[!type %in% invalid]
-
-    if (length(valid) == 0) {
-      cli::cli_abort("All the types passed are invalid.")
-    }
-
-    has_all <- sum(stringr::str_detect(valid, "all"))
-
-    if(has_all >= 1) {
-      cli::cli_abort("Please pass only 'all' or types excluding 'all'.")
-    }
-
-    sapply(type, function(x) get_table_data(.table = x, parallel_calls = parallel_calls))
-  } else if (length(type) == 1 && type %in% valid_types) {
-    get_table_data(type)
   }
-
 }
 
 
@@ -441,21 +410,21 @@ freeze_polis_data <- function() {
 #' @description
 #' Create standard analytic datasets from raw POLIS data
 #'
-#' @param type `str` Specify the type of preprocessing to complete
-#' @param who_region `str` Optional WHO region to filter data
+#' @param type `str` specify the type of preprocessing to complete
+#' @param who_region `str` optional WHO region to filter data
 #'      Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.
 #'
-#' @param output_format `str` Output_format to save files as.
+#' @param output_format `str` output_format to save files as.
 #'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
-#'    'parquet'.
+#'    'rds'.
 #'
-#' @returns Analytic files.
+#' @returns Analytic rds files
 #' @examples
 #' \dontrun{
 #' preprocess_data(type = "cdc") # must run init_tidypolis to specify POLIS data location first
 #' }
 #' @export
-preprocess_data <- function(type = "cdc", who_region = NULL, output_format = "parquet") {
+preprocess_data <- function(type = "cdc", who_region = NULL, output_format = "rds") {
   types <- c("cdc")
   outputs <- c("rds", "rda", "csv", "parquet")
 
