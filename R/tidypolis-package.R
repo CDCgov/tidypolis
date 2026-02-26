@@ -3,8 +3,6 @@
 
 ## usethis namespace: start
 #' @import dplyr cli stringr lubridate sf
-#' @importFrom arrow open_dataset
-#' @importFrom arrow read_parquet
 #' @importFrom cluster clusGap
 #' @importFrom doFuture registerDoFuture
 #' @importFrom foreach %dopar%

@@ -4,13 +4,10 @@
 \alias{get_polis_data}
 \title{Manager function to get and update POLIS data}
 \usage{
-get_polis_data(type = "all", parallel_calls = TRUE)
+get_polis_data(type = "all")
 }
 \arguments{
-\item{type}{\code{str} Choose to download population data ("pop") or all other data. Defaults to "all",
-which includes Virus, Case, Human Specimen, Environmental Sample, Activity, Subactivity, LQAS, and IM.}
-
-\item{parallel_calls}{\code{str} Whether to get table IDs using parallel calls. Defaults to \code{TRUE}.}
+\item{type}{choose to download population data ("pop") or all other data. Default's to "all"}
 }
 \description{
 This function iterates through all tables and loads POLIS data. It
@@ -19,6 +16,6 @@ deleted rows are reflected in the local system.
 }
 \examples{
 \dontrun{
-get_polis_data() # must be run after using init_tidypolis and providing a valid API key.
+get_polis_data() # must be run after using init_tidypolis and providing a valid API key
 }
 }

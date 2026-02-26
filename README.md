@@ -1,7 +1,8 @@
 # tidypolis
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/CDCGov/tidypolis/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/CDCGov/tidypolis/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/nish-kishore/tidypolis/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nish-kishore/tidypolis/actions/workflows/R-CMD-check.yaml)
+[![Codecov test coverage](https://codecov.io/gh/CDCgov/tidypolis/graph/badge.svg)](https://app.codecov.io/gh/CDCgov/tidypolis)
 <!-- badges: end -->
 
 
@@ -12,7 +13,7 @@ to clarify agency specific pre-processing and data cleaning steps are also inclu
 First make sure you have `devtools` installed. Then run the following command: 
 
 ```
-devtools::install_github("CDCGov/tidypolis")
+devtools::install_github("nish-kishore/tidypolis")
 ```
 
 After you can use any function developed in this package using 
@@ -41,11 +42,11 @@ used by the SIR team.
 ## Release Schedule
 
 -   Please see the
-    [Releases](https://github.com/CDCGov/tidypolis/releases)
+    [Releases](https://github.com/nish-kishore/tidypolis/releases)
     page for specifics on previous releases.
 
 ## Contact 
-Please send a message to Mervin Keith Cuadera at xrg9@cdc.gov for any questions or queries. 
+Please send a message to Nishant Kishore are ynm2@cdc.gov for any questions or queries. 
 
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not

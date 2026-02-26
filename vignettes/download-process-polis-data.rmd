@@ -118,10 +118,10 @@ This function will produce a number of outputs into `POLIS_folder/data/Core_Read
 - afp_linelist_2001-01-01_{date_of_latest_case}.rds
 - afp_linelist_2019-01-01_{date_of_latest_case}.rds
 - afp_linelist_2020-01-01_{date_of_latest_case}.rds
-- other_surveillance_type_linelist_2016_{latest year}.rds
-- other_surveillance_type_linelist_2020_{latest year}.rds
-- sia_2000_{latest year}.rds
-- sia_2020_{latest year}.rds
+- other_surveillance_type_linelist_2016_2025.rds
+- other_surveillance_type_linelist_2020_2025.rds
+- sia_2000_2025.rds
+- sia_2020_2025.rds
 - es_2001-01-08_{date_of_latest_detection}.rds
 - positives_2001-01-01_{date_of_latest_positive}.rds
 

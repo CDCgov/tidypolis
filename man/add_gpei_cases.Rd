@@ -7,7 +7,7 @@
 add_gpei_cases(
   azcontainer = suppressMessages(get_azure_storage_connection()),
   proxy_data_loc = "/Data/proxy/polio_proxy_data.csv",
-  polis_pos_loc
+  polis_pos_loc = "/Data/polis/positives_2001-01-01_2025-01-06.rds"
 )
 }
 \arguments{
@@ -15,8 +15,7 @@ add_gpei_cases(
 
 \item{proxy_data_loc}{str location of proxy_data on EDAV}
 
-\item{polis_pos_loc}{str location of latest positives dataset generated from POLIS API data. This is located in
-/Data/polis and is a file name starting with "positives_2001-01-01".}
+\item{polis_pos_loc}{str location of latest positives dataset generated from POLIS API data}
 }
 \description{
 \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
