@@ -172,19 +172,19 @@ apply_growth_rate_to_pop_data <- function(pop_dir = "GID/PEB/SIR/Data/pop",
   # WHO
 
   cli::cli_process_start("Writing new population data to the population folder")
-  final_ctry |> tidypolis_io(io = "write",
-                             file_path = file_path(pop_dir,
-                                                   "ctry.pop_long_unofficial.rds"),
+  ctry.pop |> tidypolis_io(io = "write",
+                             file_path = file.path(pop_dir,
+                                                   "ctry.pop_long_unofficial.parquet"),
                              edav = edav,
                              edav_default_dir = NULL)
-  final_prov |> tidypolis_io(io = "write",
-                             file_path = file_path(pop_dir,
-                                                   "prov.pop_long_unofficial.rds"),
+  prov.pop |> tidypolis_io(io = "write",
+                             file_path = file.path(pop_dir,
+                                                   "prov.pop_long_unofficial.parquet"),
                              edav = edav,
                              edav_default_dir = NULL)
-  final_dist |> tidypolis_io(io = "write",
-                             file_path = file_path(pop_dir,
-                                                   "dist.pop_long_unofficial.rds"),
+  dist.pop |> tidypolis_io(io = "write",
+                             file_path = file.path(pop_dir,
+                                                   "dist.pop_long_unofficial.parquet"),
                              edav = edav,
                              edav_default_dir = NULL)
   cli::cli_process_done()
