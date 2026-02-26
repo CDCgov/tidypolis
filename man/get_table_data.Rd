@@ -5,17 +5,20 @@
 \title{Request data from single table}
 \usage{
 get_table_data(
-  api_key = Sys.getenv("POLIS_API_Key"),
   .table,
-  output_format = "rds"
+  api_key = Sys.getenv("POLIS_API_KEY"),
+  parallel_calls = TRUE,
+  output_format = "parquet"
 )
 }
 \arguments{
 \item{api_key}{API Key}
 
-\item{.table}{Table value to retrieve}
+\item{api_key}{\code{str} API Key. Defaults to the value of the global env variable POLIS_API_KEY.}
 
-\item{output_format}{\code{str} Output format of the file.}
+\item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
+
+\item{output_format}{\code{str} Output format of the table. Defaults to parquet.}
 }
 \value{
 Tibble with reference data

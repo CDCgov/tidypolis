@@ -1,7 +1,7 @@
 # tidypolis
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/nish-kishore/tidypolis/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nish-kishore/tidypolis/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/CDCGov/tidypolis/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/CDCGov/tidypolis/actions/workflows/R-CMD-check.yaml)
 [![Codecov test coverage](https://codecov.io/gh/CDCgov/tidypolis/graph/badge.svg)](https://app.codecov.io/gh/CDCgov/tidypolis)
 <!-- badges: end -->
 
