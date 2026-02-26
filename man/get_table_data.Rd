@@ -6,7 +6,7 @@
 \usage{
 get_table_data(
   .table,
-  api_key = Sys.getenv("POLIS_API_KEY"),
+  api_key = Sys.getenv("POLIS_API_Key"),
   parallel_calls = TRUE,
   output_format = "parquet"
 )
