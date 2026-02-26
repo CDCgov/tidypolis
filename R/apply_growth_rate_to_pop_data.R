@@ -119,11 +119,39 @@ apply_growth_rate_to_pop_data <- function(pop_dir = "GID/PEB/SIR/Data/pop",
   # Load country pop
   ctry_pop <- tidypolis_io(io = "read", file_path = ctry_file,
                            edav = edav, edav_default_dir = NULL)
+  prov_pop <- tidypolis_io(io = "read", file_path = prov_file,
+                           edav = edav, edav_default_dir = NULL)
+  dist_pop <- tidypolis_io(io = "read", file_path = dist_file,
+                           edav = edav, edav_default_dir = NULL)
 
   # Join growth rates based on ADM0_NAME
   ctry_w_gr <- dplyr::left_join(ctry_pop, gr, by = c("ADM0_NAME" = "Admin0Name",
                                                      "year"))
-  prov_w
+  prov_w_gr <- dplyr::left_join(prov_pop, gr, by = c("ADM0_NAME" = "Admin0Name",
+                                                     "year"))
+  dist_w_gr <- dplyr::left_join(dist_pop, gr, by = c("ADM0_NAME" = "Admin0Name",
+                                                     "year"))
 
+  # Create population with new growth rates
+  final_ctry <- get_new_year_pop(ctry_w_gr)
+  final_prov <- get_new_year_pop(prov_w_gr)
+  final_dist <- get_new_year_pop(dist_w_gr)
+
+  # Output results with unofficial suffix to indicate that the new year's pop
+  # are calculated using growth rates rather than being obtained directly from
+  # WHO
+
+  final_ctry |> tidypolis_io(io = "write",
+                             file_path = file_path(pop_dir, "ctry.pop_long_unofficial.rds"),
+                             edav = edav,
+                             edav_default_dir = NULL)
+  final_prov |> tidypolis_io(io = "write",
+                             file_path = file_path(pop_dir, "prov.pop_long_unofficial.rds"),
+                             edav = edav,
+                             edav_default_dir = NULL)
+  final_dist |> tidypolis_io(io = "write",
+                             file_path = file_path(pop_dir, "dist.pop_long_unofficial.rds"),
+                             edav = edav,
+                             edav_default_dir = NULL)
 
 }
