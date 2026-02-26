@@ -128,13 +128,13 @@ apply_growth_rate_to_pop_data <- function(pop_dir = "GID/PEB/SIR/Data/pop",
   pop_files <- dplyr::tibble(file_name = tidypolis_io(io = "list", file_path = pop_dir,
                                                        edav = edav, edav_default_dir = NULL))
   ctry_file <- pop_files |>
-    dplyr::filter(stringr::str_detect(file_name, ctry_pop_path)) |>
+    dplyr::filter(stringr::str_detect(file_name, stringr::fixed(ctry_pop_path))) |>
     dplyr::pull()
   prov_file <- pop_files |>
-    dplyr::filter(stringr::str_detect(file_name, prov_pop_path)) |>
+    dplyr::filter(stringr::str_detect(file_name, stringr::fixed(prov_pop_path))) |>
     dplyr::pull()
   dist_file <- pop_files |>
-    dplyr::filter(stringr::str_detect(file_name, dist_pop_path)) |>
+    dplyr::filter(stringr::str_detect(file_name, stringr::fixed(dist_pop_path))) |>
     dplyr::pull()
 
   # Load growth rate file
