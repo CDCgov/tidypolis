@@ -1,5 +1,39 @@
 # Private ----
 
+#' Calculate pop counts for new year
+#'
+#' @description
+#' Applies the growth rate from the previous year to calculate new populations
+#' for the new year.
+#'
+#' @param pop_w_gr `tibble` Population file with growth rates.
+#'
+#' @returns `tibble` New year population data.
+#' @keywords internal
+#'
+get_new_year_pop <- function(pop_w_gr) {
+  # Forward fill growth rates
+  pop_w_gr <- pop_w_gr |>
+    dplyr::group_by(ADM0_NAME) |>
+    dplyr::arrange(year, .by_group = TRUE) |>
+    tidyr::fill(growth_rate, .direction = "downup") |>
+    dplyr::ungroup()
+
+  # Obtain growth rates for the new year
+  pop_new_year <- pop_w_gr |>
+    dplyr::filter(year == lubridate::year(Sys.Date()) - 1) |>
+    dplyr::mutate(year = lubridate::year(Sys.Date())) |>
+    dplyr::mutate(across(dplyr::any_of(c("u15pop", "u5pop", "totpop")),
+                         \(x) x * (1+growth_rate)))
+
+  # Join new year data to ctry pop
+  pop_final <- dplyr::bind_rows(pop_w_gr, pop_new_year) |>
+    dplyr::arrange(year) |>
+    dplyr::select(-growth_rate)
+
+  return(pop_final)
+}
+
 #' Load population growth rates
 #'
 #' @details
@@ -57,6 +91,7 @@ load_growth_rates <- function(
 
 }
 # Public ----
+
 apply_growth_rate_to_pop_data <- function(pop_dir = "GID/PEB/SIR/Data/pop",
                                           ctry_pop_path = file.path(pop_dir, "ctry.pop.long"),
                                           prov_pop_path = file.path(pop_dir, "prov.pop.long"),
@@ -86,8 +121,9 @@ apply_growth_rate_to_pop_data <- function(pop_dir = "GID/PEB/SIR/Data/pop",
                            edav = edav, edav_default_dir = NULL)
 
   # Join growth rates based on ADM0_NAME
-  ctry_w_gr <- dplyr::left_join(ctry_pop, growth_rate, by )
+  ctry_w_gr <- dplyr::left_join(ctry_pop, gr, by = c("ADM0_NAME" = "Admin0Name",
+                                                     "year"))
+  prov_w
 
-  # Apply growth rates
 
 }
