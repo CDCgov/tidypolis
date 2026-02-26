@@ -92,6 +92,30 @@ load_growth_rates <- function(
 }
 # Public ----
 
+#' Create estimated population counts for the new year
+#'
+#' @description
+#' Using growth rate estimates for the latest year available, the function
+#' estimates the population counts of the new year. This is typically done when the
+#' new population estimates for the new year is unavailable. New official population
+#' counts are typically reported in April through August of the new year.
+#'
+#' @param pop_dir `str` Path to the population directory.
+#' @param ctry_pop_path `str` Regex to obtain the name of the country population file.
+#' @param prov_pop_path `str` Regex to obtain the name of the province population file.
+#' @param dist_pop_path `str` Regex to obtain the name of the district population file.
+#' @param growth_path `str` Path to the growth rate file. The source of this dataset is in
+#' the [World Population Prospects](https://population.un.org/wpp/downloads?folder=Standard%20Projections&group=Most%20used)
+#' website, using the "Compact" file.
+#' @param edav `logical` Whether to read/write from EDAV. Defaults to `TRUE`.
+#'
+#' @returns `list` List containing the population data, including the new year, invisibly.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' apply_growth_rate_to_pop_data
+#' }
 apply_growth_rate_to_pop_data <- function(pop_dir = "GID/PEB/SIR/Data/pop",
                                           ctry_pop_path = file.path(pop_dir, "ctry.pop.long"),
                                           prov_pop_path = file.path(pop_dir, "prov.pop.long"),
@@ -114,17 +138,22 @@ apply_growth_rate_to_pop_data <- function(pop_dir = "GID/PEB/SIR/Data/pop",
     dplyr::pull()
 
   # Load growth rate file
+  cli::cli_process_start("Loading growth rate data")
   gr <- load_growth_rates(growth_path, edav)
+  cli::cli_process_done()
 
-  # Load country pop
+  # Load population data
+  cli::cli_process_start("Loading population files")
   ctry_pop <- tidypolis_io(io = "read", file_path = ctry_file,
                            edav = edav, edav_default_dir = NULL)
   prov_pop <- tidypolis_io(io = "read", file_path = prov_file,
                            edav = edav, edav_default_dir = NULL)
   dist_pop <- tidypolis_io(io = "read", file_path = dist_file,
                            edav = edav, edav_default_dir = NULL)
+  cli::cli_process_done()
 
   # Join growth rates based on ADM0_NAME
+  cli::cli_process_start("Calculating population estimates for the new year")
   ctry_w_gr <- dplyr::left_join(ctry_pop, gr, by = c("ADM0_NAME" = "Admin0Name",
                                                      "year"))
   prov_w_gr <- dplyr::left_join(prov_pop, gr, by = c("ADM0_NAME" = "Admin0Name",
@@ -133,25 +162,33 @@ apply_growth_rate_to_pop_data <- function(pop_dir = "GID/PEB/SIR/Data/pop",
                                                      "year"))
 
   # Create population with new growth rates
-  final_ctry <- get_new_year_pop(ctry_w_gr)
-  final_prov <- get_new_year_pop(prov_w_gr)
-  final_dist <- get_new_year_pop(dist_w_gr)
+  ctry.pop <- get_new_year_pop(ctry_w_gr)
+  prov.pop <- get_new_year_pop(prov_w_gr)
+  dist.pop <- get_new_year_pop(dist_w_gr)
+  cli::cli_process_done()
 
   # Output results with unofficial suffix to indicate that the new year's pop
   # are calculated using growth rates rather than being obtained directly from
   # WHO
 
+  cli::cli_process_start("Writing new population data to the population folder")
   final_ctry |> tidypolis_io(io = "write",
-                             file_path = file_path(pop_dir, "ctry.pop_long_unofficial.rds"),
+                             file_path = file_path(pop_dir,
+                                                   "ctry.pop_long_unofficial.rds"),
                              edav = edav,
                              edav_default_dir = NULL)
   final_prov |> tidypolis_io(io = "write",
-                             file_path = file_path(pop_dir, "prov.pop_long_unofficial.rds"),
+                             file_path = file_path(pop_dir,
+                                                   "prov.pop_long_unofficial.rds"),
                              edav = edav,
                              edav_default_dir = NULL)
   final_dist |> tidypolis_io(io = "write",
-                             file_path = file_path(pop_dir, "dist.pop_long_unofficial.rds"),
+                             file_path = file_path(pop_dir,
+                                                   "dist.pop_long_unofficial.rds"),
                              edav = edav,
                              edav_default_dir = NULL)
+  cli::cli_process_done()
+
+  invisible(list(ctry.pop, prov.pop, dist.pop))
 
 }
