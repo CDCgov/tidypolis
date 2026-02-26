@@ -4,16 +4,23 @@
 \alias{get_polis_cache}
 \title{Load local POLIS cache}
 \usage{
-get_polis_cache(cache_file = Sys.getenv("POLIS_CACHE_FILE"), .table)
+get_polis_cache(cache_file = Sys.getenv("POLIS_CACHE_FILE"), .table = NULL)
 }
 \arguments{
-\item{cache_file}{\code{str} location of cache file}
+\item{cache_file}{\code{str} Location of cache file.}
 
-\item{.table}{\code{str} table to be loaded}
+\item{.table}{\code{str} Table(s) to be loaded. A vector of table names can be passed. Defaults to \code{NULL},
+which loads the cache file in full.}
 }
 \value{
-Return tibble with table information
+\code{tibble} Metadata of the POLIS API table specified.
 }
 \description{
-Pull cache data for a particular table
+Pull metadata for a particular POLIS table.
+}
+\examples{
+\dontrun{
+cache <- get_polis_cache()
+}
+
 }

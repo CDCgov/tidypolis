@@ -1,575 +1,3 @@
-#### POLIS Interactions ####
-
-#' Request data from single table
-#'
-#' @description Get POLIS table Data
-#' @param api_key API Key
-#' @param .table Table value to retrieve
-#' @param output_format `str` Output format of the file.
-#' @returns Tibble with reference data
-#' @examples
-#' \dontrun{
-#' get_table_data(.table = "case")
-#' get_table_data(.table = "virus") # must run init_tidypolis first in order to specify API key
-#' }
-#' @export
-get_table_data <- function(api_key = Sys.getenv("POLIS_API_Key"),
-                           .table,
-                           output_format = "rds") {
-  base_url <- "https://extranet.who.int/polis/api/v2/"
-  table_data <- get_polis_cache(.table = .table)
-  table_url <- paste0(base_url, table_data$endpoint)
-
-  # check if ID API works for key files
-  api_url <-
-    paste0(
-      base_url,
-      table_data$endpoint,
-      "?$select=",
-      table_data$polis_id
-    )
-
-  if (table_data$table %in% c(
-    "human_specimen",
-    "environmental_sample",
-    "activity",
-    "sub_activity",
-    "lqas",
-    "pop"
-  )) {
-    urls <-
-      create_table_urls(
-        url = api_url,
-        table_size = 3000,
-        type = "lab-partial"
-      )
-  } else {
-    urls <-
-      create_table_urls(
-        url = api_url,
-        table_size = 3000,
-        type = "partial"
-      )
-  }
-
-  id_return <- tryCatch(
-    call_single_url(urls[1], times = 1),
-    error = function(cond) {
-      return("Error")
-    }
-  )
-
-  id_error <- is.character(id_return)
-
-  rm(urls)
-  rm(api_url)
-
-  cli::cli_h1(paste0("Downloading POLIS Data for: ", table_data$table))
-
-  # If never downloaded before or if ID API doesn't work
-  if ((is.na(table_data$last_sync) &
-    !is.na(table_data$polis_id)) |
-    id_error | is.na(table_data$polis_update_id)) {
-    if (id_error) {
-      cli::cli_alert_info(
-        paste0(
-          table_data$endpoint,
-          " has been downloaded before but the ID API is not functional, downloading all data...checking size..."
-        )
-      )
-    } else {
-      if (is.na(table_data$polis_update_id)) {
-        cli::cli_alert_info(
-          paste0(
-            table_data$endpoint,
-            " does not have a unique timestamps for the update, the entire table must be downloaded..."
-          )
-        )
-      } else {
-        cli::cli_alert_info(
-          paste0(
-            table_data$endpoint,
-            " has not been downloaded before...checking size..."
-          )
-        )
-      }
-    }
-    table_size <- get_table_size(.table = table_data$table)
-    cli::cli_alert_info(paste0("Getting ready to download ", table_size, " new rows of data!"))
-
-    if (table_data$table %in% c(
-      "human_specimen",
-      "environmental_sample",
-      "activity",
-      "sub_activity",
-      "lqas",
-      "pop"
-    )) {
-      urls <-
-        create_table_urls(
-          url = table_url,
-          table_size = table_size,
-          type = "lab"
-        )
-    } else {
-      urls <-
-        create_table_urls(
-          url = table_url,
-          table_size = table_size,
-          type = "full"
-        )
-    }
-
-    cli::cli_process_start("Downloading data")
-    out <- call_urls(urls)
-    update_polis_log(
-      .event = paste0(
-        "Downloaded ",
-        table_size,
-        " rows of ",
-        table_data$table,
-        " data"
-      ),
-      .event_type = "INFO"
-    )
-    cli::cli_process_done()
-
-    # update cache information
-    cli::cli_process_start("Updating cache")
-    if (is.na(table_data$polis_update_id)) {
-      update_polis_cache(
-        cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-        .table = .table,
-        .nrow = nrow(out),
-        .update_val = NA
-      )
-    } else {
-      update_polis_cache(
-        cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-        .table = .table,
-        .nrow = nrow(out),
-        .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])), na.rm = T)
-      )
-    }
-
-    cli::cli_process_done()
-
-    cli::cli_process_start("Writing data cache")
-    tidypolis_io(obj = out, io = "write", file_path = paste0(
-      Sys.getenv("POLIS_DATA_CACHE"),
-      "/",
-      table_data$table,
-      ".",
-      output_format
-    ))
-    update_polis_log(
-      .event = paste0(table_data$table, " data saved locally"),
-      .event_type = "PROCESS"
-    )
-    cli::cli_process_done()
-
-    gc()
-  } else {
-    if (!is.na(table_data$last_sync)) {
-      # pull updated data
-      # create new table url
-
-      time_modifier <- paste0(
-        "&$filter=",
-        table_data$polis_update_id,
-        " gt DateTime'",
-        sub(" ", "T", as.character(table_data$polis_update_value)),
-        "'"
-      )
-
-      time_modifier <- gsub(" ", "+", time_modifier, )
-
-      table_size <-
-        get_table_size(.table = table_data$table, extra_filter = time_modifier)
-
-      cli::cli_alert_success(paste0(
-        table_data$table,
-        ": ",
-        table_size,
-        " new or updated records identified!"
-      ))
-      update_polis_log(
-        .event = paste0(
-          table_data$table,
-          ": ",
-          table_size,
-          " new or updated records identified!"
-        ),
-        .event_type = "INFO"
-      )
-
-      if (table_size > 0) {
-        table_url <- paste0(
-          table_url,
-          "?$filter=",
-          table_data$polis_update_id,
-          " gt DateTime'",
-          sub(" ", "T", as.character(table_data$polis_update_value)),
-          "'"
-        )
-
-        table_url <- gsub(" ", "+", table_url, )
-
-        if (table_data$table %in% c(
-          "human_specimen",
-          "environmental_sample",
-          "activity",
-          "sub_activity",
-          "lqas"
-        )) {
-          urls <-
-            create_table_urls(
-              url = table_url,
-              table_size = table_size,
-              type = "lab-partial"
-            )
-        } else {
-          urls <-
-            create_table_urls(
-              url = table_url,
-              table_size = table_size,
-              type = "partial"
-            )
-        }
-
-        cli::cli_process_start("Downloading data")
-        out <- call_urls(urls)
-        update_polis_log(
-          .event = paste0(
-            "Downloaded ",
-            table_size,
-            " rows of ",
-            table_data$table,
-            " data"
-          ),
-          .event_type = "INFO"
-        )
-        cli::cli_process_done()
-
-        # check ids and make list of ids to be deleted
-        cli::cli_process_start("Getting table Ids")
-        ids <-
-          get_table_ids(.table = table_data$table, .id = table_data$polis_id)
-        cli::cli_process_done()
-
-        # load in cache
-        cli::cli_process_start("Loading existing cache")
-        old_cache <-
-          tidypolis_io(io = "read", file_path = paste0(
-            Sys.getenv("POLIS_DATA_CACHE"),
-            "/",
-            table_data$table,
-            ".",
-            output_format
-          ))
-        cli::cli_process_done()
-        old_cache_n <- nrow(old_cache)
-        new_data_ids_in_old_cache <-
-          sum(dplyr::pull(out[table_data$polis_id]) %in% dplyr::pull(old_cache[table_data$polis_id]))
-        new_data_ids <- table_size - new_data_ids_in_old_cache
-        deleted_ids <-
-          dplyr::pull(old_cache[table_data$polis_id])[!dplyr::pull(old_cache[table_data$polis_id]) %in% ids]
-        # old_data_ids_in_new <- dplyr::pull(old_cache[table_data$polis_id])[dplyr::pull(old_cache[table_data$polis_id]) %in% dplyr::pull(out[table_data$polis_id])]
-
-        cli::cli_h3(paste0("'", table_data$table, "'", " table data"))
-        cli::cli_bullets(c(
-          "*" = paste0(table_size, " new rows of data downloaded"),
-          "*" = paste0(old_cache_n, " rows of data available in old cache"),
-          "*" = paste0(
-            new_data_ids,
-            " new ",
-            table_data$polis_id,
-            "s identified"
-          ),
-          "*" = paste0(new_data_ids_in_old_cache, " rows of data being updated"),
-          "*" = paste0(length(deleted_ids), " rows of data were deleted")
-        ))
-
-        update_polis_log(
-          .event = paste0(
-            table_data$table,
-            " - update - ",
-            table_size,
-            " new rows of data downloaded; ",
-            old_cache_n,
-            " rows of data available in old cache; ",
-            new_data_ids,
-            " new ",
-            table_data$polis_id,
-            "s identified; ",
-            new_data_ids_in_old_cache,
-            " rows of data being updated;",
-            paste0(length(deleted_ids), " rows of data were deleted - "),
-            paste0(deleted_ids, collapse = ", ")
-          ),
-          .event_type = "INFO"
-        )
-
-        # update cache
-        old_cache <- old_cache |>
-          dplyr::filter(!get(table_data$polis_id) %in% dplyr::pull(out[table_data$polis_id]))
-        old_cache <-
-          bind_and_reconcile(new_data = out, old_data = old_cache)
-
-        # delete data that no longer exists in POLIS
-        old_cache <- old_cache |>
-          dplyr::filter(get(table_data$polis_id) %in% ids)
-
-        # check for missed IDs, if IDs missed then redownload full table
-        # create ids table in order to filter
-        cli::cli_process_start("Checking for missed records in download")
-        ids_table <- as.data.frame(ids)
-        missed.id <- ids_table |>
-          dplyr::filter(!ids %in% dplyr::pull(old_cache[table_data$polis_id]))
-        cli::cli_process_done()
-
-        # if there are missed IDs, clear old cache and re-download full table
-        if (nrow(missed.id) > 0) {
-          cli::cli_alert_info(
-            paste0(
-              table_data$endpoint,
-              " has been downloaded before but ",
-              nrow(missed.id),
-              " record(s) missing, downloading all data...checking size..."
-            )
-          )
-
-          table_size <- get_table_size(.table = table_data$table)
-          cli::cli_alert_info(paste0("Getting ready to download ", table_size, " new rows of data!"))
-
-          table_url <- paste0(base_url, table_data$endpoint)
-
-          if (table_data$table %in% c(
-            "human_specimen",
-            "environmental_sample",
-            "activity",
-            "sub_activity",
-            "lqas",
-            "pop"
-          )) {
-            urls <-
-              create_table_urls(
-                url = table_url,
-                table_size = table_size,
-                type = "lab"
-              )
-          } else {
-            urls <-
-              create_table_urls(
-                url = table_url,
-                table_size = table_size,
-                type = "full"
-              )
-          }
-
-          cli::cli_process_start("Downloading data")
-          out <- call_urls(urls)
-          update_polis_log(
-            .event = paste0(
-              "Downloaded ",
-              table_size,
-              " rows of ",
-              table_data$table,
-              " data"
-            ),
-            .event_type = "INFO"
-          )
-          cli::cli_process_done()
-
-          # update cache information
-          cli::cli_process_start("Updating cache")
-          if (is.na(table_data$polis_update_id)) {
-            update_polis_cache(
-              cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-              .table = .table,
-              .nrow = nrow(out),
-              .update_val = NA
-            )
-          } else {
-            update_polis_cache(
-              cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-              .table = .table,
-              .nrow = nrow(out),
-              .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])), na.rm = T)
-            )
-          }
-
-          cli::cli_process_done()
-
-          cli::cli_process_start("Writing data cache")
-          tidypolis_io(obj = out, io = "write", file_path = paste0(
-            Sys.getenv("POLIS_DATA_CACHE"),
-            "/",
-            table_data$table,
-            ".",
-            output_format
-          ))
-          update_polis_log(
-            .event = paste0(table_data$table, " data saved locally"),
-            .event_type = "PROCESS"
-          )
-          cli::cli_process_done()
-
-          gc()
-
-          cli::cli_process_done()
-        } else {
-          # write cache
-
-          cli::cli_process_start("Updating cache log")
-          update_polis_cache(
-            cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-            .table = .table,
-            .nrow = nrow(old_cache),
-            .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])))
-          )
-          cli::cli_process_done()
-
-          cli::cli_process_start("Writing data cache")
-          tidypolis_io(
-            obj = old_cache, io = "write",
-            file_path = paste0(
-              Sys.getenv("POLIS_DATA_CACHE"),
-              "/",
-              table_data$table,
-              ".",
-              output_format
-            )
-          )
-          update_polis_log(
-            .event = paste0(table_data$table, " data saved locally"),
-            .event_type = "PROCESS"
-          )
-          cli::cli_process_done()
-
-          # garbage clean
-          gc()
-        }
-      }
-    }
-  }
-}
-
-#' Get table size from POLIS
-#'
-#' @param .table `str` Table to be downloaded
-#' @param api_key `str` API Key
-#' @param cache_file `str` Cache file location
-#' @param extra_filter `str` additional filtering parameters
-#' @export
-get_table_size <- function(.table,
-                           api_key = Sys.getenv("POLIS_API_KEY"),
-                           cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-                           extra_filter = "") {
-  table_data <- get_polis_cache(.table = .table)
-
-  # disable SSL Mode
-  httr::set_config(httr::config(ssl_verifypeer = 0L))
-
-  # Variables: URL, Token, Filters, ...
-  polis_api_root_url <- "https://extranet.who.int/polis/api/v2/"
-
-  api_url <-
-    paste0(
-      polis_api_root_url,
-      table_data$endpoint,
-      "?$inlinecount=allpages&$top=0",
-      extra_filter
-    )
-
-  # response <- httr::GET(url=api_url, httr::add_headers("authorization-token" = api_key))
-
-  response <- httr::RETRY(
-    verb = "GET",
-    url = api_url,
-    config = httr::add_headers("authorization-token" = api_key),
-    times = 10,
-    pause_min = 2,
-    quiet = TRUE,
-    terminate_on_success = TRUE
-  )
-
-  out <- jsonlite::fromJSON(rawToChar(response$content))
-
-  # dplyr::as_tibble(out$value)
-
-
-  table_size <- response |>
-    httr::content(type = "text", encoding = "UTF-8") |>
-    jsonlite::fromJSON()
-
-  table_size <- as.integer(table_size$odata.count)
-
-  return(table_size)
-}
-
-#' Get Ids
-#'
-#' @description return Ids availalbe in table
-#' @param .table `str` table
-#' @param .id `str` id variable
-#' @param api_key `str` POLIS API Key
-#' @returns character array of ids
-#' @export
-get_table_ids <-
-  function(.table, .id, api_key = Sys.getenv("POLIS_API_KEY")) {
-    cli::cli_process_start(paste0("Downloading ", .table, " table IDs"))
-
-    table_data <- get_polis_cache(.table = .table)
-
-    # disable SSL Mode
-    httr::set_config(httr::config(ssl_verifypeer = 0L))
-
-    # Variables: URL, Token, Filters, ...
-    polis_api_root_url <- "https://extranet.who.int/polis/api/v2/"
-
-    api_url <-
-      paste0(
-        polis_api_root_url,
-        table_data$endpoint,
-        "?$select=",
-        table_data$polis_id
-      )
-
-    table_size <- get_table_size(.table = .table)
-
-    if (table_data$table %in% c(
-      "human_specimen",
-      "environmental_sample",
-      "activity",
-      "sub_activity",
-      "lqas"
-    )) {
-      urls <-
-        create_table_urls(
-          url = api_url,
-          table_size = table_size,
-          type = "lab-partial"
-        )
-    } else {
-      urls <-
-        create_table_urls(
-          url = api_url,
-          table_size = table_size,
-          type = "partial"
-        )
-    }
-
-    ids <- call_urls(urls) |>
-      dplyr::pull(table_data$polis_id)
-
-    gc()
-
-    cli::cli_process_done()
-
-    return(ids)
-  }
-
 #### POLIS API ####
 
 #' Test out if POLIS key is valid
@@ -662,21 +90,6 @@ call_urls <- function(urls) {
     dplyr::pull(response) |>
     dplyr::bind_rows()
 
-  # Convert string representations of NULL/NA to actual NA values
-  resp <- resp |>
-    dplyr::mutate(
-      dplyr::across(
-        dplyr::everything(),
-        ~ dplyr::case_when(
-          as.character(.x) %in% c("NULL", "NA", "") ~ NA_character_,
-          TRUE ~ as.character(.x)
-        )
-      )
-    )
-
-  # Infer and apply column types (works with sparse data)
-  resp <- readr::type_convert(resp, col_types = readr::cols())
-
   log <- dplyr::bind_rows(y) |>
     dplyr::pull(log) |>
     dplyr::bind_rows()
@@ -692,114 +105,6 @@ call_urls <- function(urls) {
   gc()
   return(resp)
 }
-
-#' Run single table diagnostic
-#'
-#' @description Run single table diagnostic
-#' @param .table `str` table name
-#' @param key `str` POLIS API Key
-#' @returns tibble with diagnostic data
-run_single_table_diagnostic <-
-  function(.table, key = Sys.getenv("POLIS_API_Key")) {
-    base_url <- "https://extranet.who.int/polis/api/v2/"
-    table_data <- get_polis_cache(.table = .table)
-    table_url <- paste0(base_url, table_data$endpoint)
-    table_size <- get_table_size(.table = .table)
-
-    if (table_data$table %in% c(
-      "human_specimen",
-      "environmental_sample",
-      "activity",
-      "sub_activity",
-      "lqas"
-    )) {
-      urls <-
-        create_table_urls(
-          url = table_url,
-          table_size = table_size,
-          type = "lab"
-        )
-    } else {
-      urls <-
-        create_table_urls(
-          url = table_url,
-          table_size = table_size,
-          type = "full"
-        )
-    }
-
-    data_url <- urls[1]
-
-
-    # disable SSL Mode
-    httr::set_config(httr::config(ssl_verifypeer = 0L))
-
-    # Variables: URL, Token, Filters, ...
-    polis_api_root_url <- "https://extranet.who.int/polis/api/v2/"
-
-    api_url <-
-      paste0(
-        polis_api_root_url,
-        table_data$endpoint,
-        "?$select=",
-        table_data$polis_id
-      )
-
-    if (table_data$table %in% c(
-      "human_specimen",
-      "environmental_sample",
-      "activity",
-      "sub_activity",
-      "lqas"
-    )) {
-      urls <-
-        create_table_urls(
-          url = api_url,
-          table_size = table_size,
-          type = "lab-partial"
-        )
-    } else {
-      urls <-
-        create_table_urls(
-          url = api_url,
-          table_size = table_size,
-          type = "partial"
-        )
-    }
-
-    id_url <- urls[1]
-
-    tick <- Sys.time()
-    data_return <- tryCatch(
-      call_single_url(data_url, times = 1),
-      error = function(cond) {
-        return("Error")
-      }
-    )
-    tock <- Sys.time()
-    data_time <- tock - tick
-
-    tick <- Sys.time()
-    id_return <- tryCatch(
-      call_single_url(id_url, times = 1),
-      error = function(cond) {
-        return("Error")
-      }
-    )
-    tock <- Sys.time()
-    id_time <- tock - tick
-
-    return(
-      dplyr::tibble(
-        "table" = .table,
-        "data" = ifelse(is.data.frame(data_return), "Success", "Error"),
-        "data_time" = data_time,
-        "id" = ifelse(is.data.frame(id_return), "Success", "Error"),
-        "id_time" = id_time
-      )
-    )
-  }
-
 
 #### Logging ####
 
@@ -866,21 +171,36 @@ update_polis_log <- function(log_file = Sys.getenv("POLIS_LOG_FILE"),
 
 #' Load local POLIS cache
 #'
-#' @description Pull cache data for a particular table
-#' @param cache_file `str` location of cache file
-#' @param .table `str` table to be loaded
-#' @returns Return tibble with table information
+#' @description Pull metadata for a particular POLIS table.
+#'
+#' @param cache_file `str` Location of cache file.
+#' @param .table `str` Table(s) to be loaded. A vector of table names can be passed. Defaults to `NULL`,
+#' which loads the cache file in full.
+#'
+#' @returns `tibble` Metadata of the POLIS API table specified.
 #' @export
+#' @examples
+#' \dontrun{
+#' cache <- get_polis_cache()
+#' }
+#'
 get_polis_cache <- function(cache_file = Sys.getenv("POLIS_CACHE_FILE"),
-                            .table) {
+                            .table = NULL) {
   cache <- tidypolis_io(io = "read", file_path = cache_file)
 
-  if (.table %in% dplyr::pull(cache, table)) {
-    cache |>
-      dplyr::filter(table == .table)
-  } else {
-    cli::cli_alert_warning(paste0("No entry found in the cache table for: ", .table))
+  if (is.null(.table)) {
+    return(cache)
   }
+
+  cache <- cache |>
+    dplyr::filter(table %in% .table)
+
+  if (nrow(cache) == 0) {
+    cli::cli_alert_warning(paste0("No entry found in the table(s) specified"))
+  } else {
+    return(cache)
+  }
+
 }
 
 
@@ -1004,45 +324,6 @@ request_input <- function(request,
   return(val)
 }
 
-
-#' Create table URLs
-#'
-#' @description create urls from table size and base url
-#' @param url `str` base url to be queried
-#' @param table_size `int` integer of download
-#' @param type `str` "full" or "partial"
-#' @returns array of urls
-create_table_urls <- function(url,
-                              table_size,
-                              type) {
-  prior_scipen <- getOption("scipen")
-  options(scipen = 999)
-
-  if (sum(type %in% c("full", "partial", "lab", "lab-partial")) > 0) {
-    if (type == "full") {
-      urls <-
-        paste0(url, "?$top=2000&$skip=", as.character(seq(0, as.numeric(table_size), by = 2000)))
-    }
-
-    if (type == "partial") {
-      urls <-
-        paste0(url, "&$top=2000&$skip=", seq(0, as.numeric(table_size), by = 2000))
-    }
-
-    if (type == "lab") {
-      urls <-
-        paste0(url, "?$top=1000&$skip=", as.character(seq(0, as.numeric(table_size), by = 1000)))
-    }
-
-    if (type == "lab-partial") {
-      urls <-
-        paste0(url, "&$top=1000&$skip=", seq(0, as.numeric(table_size), by = 1000))
-    }
-  }
-  return(urls)
-}
-
-
 #' Reconcile classes and bind two tibbles
 #'
 #' @param new_data `tibble` Tibble to be converted and bound.
@@ -1100,7 +381,7 @@ rename_via_crosswalk <- function(api_data,
   for (i in 1:nrow(crosswalk_sub1)) {
     api_name <- crosswalk_sub1$API_Name[i]
     web_name <- crosswalk_sub1$Web_Name[i]
-    if (!is.na(web_name) & web_name != "") {
+    if (!is.na(web_name) & web_name != "" & api_name %in% names(api_data)) {
       api_data <- api_data |>
         dplyr::rename({{ web_name }} := {{ api_name }})
     }
@@ -1129,7 +410,7 @@ remove_empty_columns <- function(dataframe) {
   }
   return(
     original_df |>
-      dplyr::select(-dplyr::any_of(empty_cols))
+      dplyr::select(-empty_cols)
   )
 }
 
@@ -1190,7 +471,7 @@ f.download.compare.01 <- function(old.download, new.download) {
     dplyr::mutate_all(~ stringr::str_trim(., side = "both")) |>
     dplyr::mutate_all(~ dplyr::na_if(., "")) |>
     # below would strip data by column find distinct values by column
-    # then rbind. So variables become rows. Makes it easier to read
+    # then bind_rows. So variables become rows. Makes it easier to read
     purrr::map_df(~ (data.frame(combine.distinct.01 = dplyr::n_distinct(.x))),
       .id = "variable"
     )
@@ -1282,309 +563,6 @@ f.download.compare.02 <- function(df.from.f.download.compare.01,
     )
   }
 }
-
-#' Sample points for missing lat/lon
-#' @description Create random samples of points for missing GPS data
-#' @param df01 `tibble` table of afp data
-#' @param global.dist.01 `sf` spatial file of all locations
-#' @returns tibble with lat/lon for all unsampled locations
-#' @keywords internal
-f.pre.stsample.01 <- function(df01, global.dist.01) {
-  # need to identify cases with no lat/lon
-  empty.coord <- df01 |>
-    dplyr::filter(is.na(polis.latitude) | is.na(polis.longitude) |
-      (polis.latitude == 0 & polis.longitude == 0))
-
-  cli::cli_process_start("Spatially joining AFP cases to global districts")
-  # create sf object from lat lon and make global.dist valid
-  df01.sf <- df01 |>
-    dplyr::filter(!epid %in% empty.coord$epid) |>
-    dplyr::mutate(
-      lon = polis.longitude,
-      lat = polis.latitude
-    ) |>
-    sf::st_as_sf(
-      coords = c(x = "lon", y = "lat"),
-      crs = sf::st_crs(global.dist.01)
-    )
-
-  global.dist.02 <- sf::st_make_valid(global.dist.01)
-
-  # identify bad shape rows after make_valid
-  check.dist.2 <- dplyr::as_tibble(sf::st_is_valid(global.dist.02))
-
-  # removing all bad shapes post make valid
-  valid.shapes <- global.dist.02[check.dist.2$value, ] |>
-    dplyr::select(GUID, ADM1_GUID, ADM0_GUID, yr.st, yr.end, Shape)
-
-  cli::cli_process_start("Evaluating invalid district shapes")
-  # invalid shapes for which we'll turn off s2
-  invalid.shapes <- global.dist.02[!check.dist.2$value, ] |>
-    dplyr::select(GUID, ADM1_GUID, ADM0_GUID, yr.st, yr.end, Shape)
-
-  # do 2 seperate st_joins the first, df02, is for valid shapes and those attached cases
-  df02 <- sf::st_join(df01.sf |>
-    dplyr::filter(!Admin2GUID %in% invalid.shapes$GUID), valid.shapes, left = T) |>
-    dplyr::filter(yronset >= yr.st & yronset <= yr.end)
-
-  # second st_join is for invalid shapes and those attached cases, turning off s2
-  sf::sf_use_s2(F)
-  df03 <- sf::st_join(df01.sf |>
-    dplyr::filter(!Admin2GUID %in% valid.shapes$GUID), invalid.shapes, left = T) |>
-    dplyr::filter(yronset >= yr.st & yronset <= yr.end)
-  sf::sf_use_s2(T)
-
-  cli::cli_process_done()
-
-  # bind back together df02 and df03
-  df04 <- dplyr::bind_rows(df02, df03)
-
-  cli::cli_process_done()
-
-  # df04 has a lot of dupes due to overlapping shapes, need to appropriately de dupe
-  # identify duplicate obs
-  dupes <- df04 |>
-    dplyr::group_by(epid) |>
-    dplyr::mutate(n = n()) |>
-    dplyr::ungroup() |>
-    dplyr::filter(n > 1)
-
-  # duplicate obs where adm2guid matches GUID in shapefile
-  dupes.01 <- dupes |>
-    dplyr::filter(Admin2GUID == GUID) |>
-    dplyr::select(-n)
-
-  # duplicate obs where adm2guid is NA or doesn't match to shapefile
-  dupes.02 <- dupes |>
-    dplyr::filter(!epid %in% dupes.01$epid) |>
-    dplyr::group_by(epid) |>
-    dplyr::slice(1) |>
-    dplyr::ungroup() |>
-    dplyr::select(-n)
-
-  # fixed duplicates
-  dupes.fixed <- dplyr::bind_rows(dupes.01, dupes.02)
-
-  rm(dupes, dupes.01, dupes.02)
-
-  # remove the duplicate cases from df04 and bind back the fixed dupes
-  df05 <- df04 |>
-    dplyr::filter(!epid %in% dupes.fixed$epid) |>
-    dplyr::bind_rows(dupes.fixed) |>
-    dplyr::mutate(
-      Admin2GUID = paste0("{", stringr::str_to_upper(admin2guid), "}", sep = ""),
-      Admin1GUID = paste0("{", stringr::str_to_upper(admin1guid), "}", sep = ""),
-      Admin0GUID = paste0("{", stringr::str_to_upper(admin0guid), "}", sep = "")
-    )
-
-  # fix guids after de-duping
-  fix.bad.guids <- df05 |>
-    dplyr::filter(Admin2GUID != GUID | Admin1GUID != ADM1_GUID | Admin0GUID != ADM0_GUID) |>
-    dplyr::mutate(
-      Admin2GUID = ifelse(Admin2GUID != GUID, GUID, Admin2GUID),
-      Admin1GUID = ifelse(Admin1GUID != ADM1_GUID, ADM1_GUID, Admin1GUID),
-      Admin0GUID = ifelse(Admin0GUID != ADM0_GUID, ADM0_GUID, Admin0GUID),
-      geo.corrected = 1
-    ) |>
-    # if fix.bad.guids is empty, then the GUID cols become logical but the
-    # join in df06 requires them to be of char type.
-    dplyr::mutate(
-      Admin2GUID = as.character(Admin2GUID),
-      Admin1GUID = as.character(Admin1GUID),
-      Admin0GUID = as.character(Admin0GUID)
-    )
-
-  # bind back cases with fixed guids
-  df06 <- df05 |>
-    dplyr::filter(!epid %in% fix.bad.guids$epid) |>
-    dplyr::mutate(geo.corrected = 0) |>
-    dplyr::bind_rows(fix.bad.guids)
-
-  rm(fix.bad.guids)
-  # identify dropped obs. obs are dropped primarily because they match to a shape that doesn't
-  # exist for the case's year onset (there are holes in the global map for certain years)
-  df04$geometry <- NULL
-  # antijoin from df01 to keep polis.lat/lon
-  dropped.obs <- dplyr::anti_join(df01, df04, by = "epid") |>
-    dplyr::filter(!epid %in% df04$epid & epid %in% df01.sf$epid)
-
-  # bring df05 and dropped observations back together, create lat/lon var from sf object previously created
-  df07 <- dplyr::bind_cols(
-    dplyr::as_tibble(df06),
-    sf::st_coordinates(df06) %>%
-      {
-        if (nrow(df06) == 0) {
-          # if df06 is empty, as_tibble won't work and we need to create it manually
-          dplyr::tibble(
-            X = as.double(NA),
-            Y = as.double(NA)
-          ) |>
-            dplyr::filter(!is.na(X))
-        } else {
-          dplyr::as_tibble(.)
-        }
-      } |>
-      dplyr::rename("lon" = "X", "lat" = "Y")
-  ) %>%
-    {
-      if (nrow(dropped.obs) != 0) {
-        dplyr::bind_rows(., dropped.obs)
-      } else {
-        .
-      }
-    } |>
-    dplyr::select(-dplyr::all_of(c("GUID", "yr.st", "yr.end")))
-
-  df07$geometry <- NULL
-
-  sf::st_geometry(global.dist.02) <- NULL
-
-  # feed only cases with empty coordinates into st_sample (vars = GUID, nperarm, id, Shape)
-  if (nrow(empty.coord |> dplyr::filter(Admin2GUID != "{NA}")) > 0) {
-    # remove NAs because can't be sampled
-    empty.coord.01 <- empty.coord |>
-      dplyr::as_tibble() |>
-      dplyr::group_by(Admin2GUID) |>
-      dplyr::summarise(nperarm = dplyr::n()) |>
-      dplyr::arrange(Admin2GUID) |>
-      dplyr::mutate(id = dplyr::row_number()) |>
-      dplyr::ungroup() |>
-      dplyr::filter(Admin2GUID != "{NA}")
-
-    empty.coord.02 <- global.dist.01 |>
-      dplyr::select(GUID) |>
-      dplyr::filter(GUID %in% empty.coord.01$Admin2GUID) |>
-      dplyr::left_join(empty.coord.01, by = c("GUID" = "Admin2GUID"))
-
-    cli::cli_process_start("Placing random points for cases with bad coordinates")
-    pt01 <- lapply(1:nrow(empty.coord.02), function(x) {
-      tryCatch(
-        expr = {
-          suppressMessages(sf::st_sample(empty.coord.02[x, ],
-            dplyr::pull(empty.coord.02[x, ], "nperarm"),
-            exact = T
-          )) |> sf::st_as_sf()
-        },
-        error = function(e) {
-          guid <- empty.coord.02[x, ]$GUID[1]
-          ctry_prov_dist_name <- global.dist.01 |>
-            dplyr::filter(GUID == guid) |>
-            dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME)
-          cli::cli_alert_warning(paste0(
-            "Fixing errors for:\n",
-            "Country: ", ctry_prov_dist_name$ADM0_NAME, "\n",
-            "Province: ", ctry_prov_dist_name$ADM1_NAME, "\n",
-            "District: ", ctry_prov_dist_name$ADM2_NAME
-          ))
-
-          suppressWarnings({
-            sf::sf_use_s2(F)
-            int <- empty.coord.02[x, ] |> sf::st_centroid(of_largest_polygon = T)
-            sf::sf_use_s2(T)
-
-            sf::st_buffer(int, dist = 3000) |>
-              sf::st_sample(dplyr::slice(empty.coord.02, x) |>
-                dplyr::pull(nperarm)) |>
-              sf::st_as_sf()
-          })
-        }
-      )
-    }) |>
-      dplyr::bind_rows()
-
-    cli::cli_process_done()
-
-    pt01_joined <- dplyr::bind_cols(
-      pt01,
-      empty.coord.02 |>
-        dplyr::as_tibble() |>
-        dplyr::select(GUID, nperarm) |>
-        tidyr::uncount(nperarm)
-    ) |>
-      dplyr::left_join(
-        dplyr::as_tibble(empty.coord.02) |>
-          dplyr::select(-Shape),
-        by = "GUID"
-      )
-
-    pt02 <- pt01_joined |>
-      dplyr::as_tibble() |>
-      dplyr::select(-nperarm, -id) |>
-      dplyr::group_by(GUID) |>
-      dplyr::arrange(GUID, .by_group = TRUE) |>
-      dplyr::mutate(id = dplyr::row_number()) |>
-      as.data.frame()
-
-    pt03 <- empty.coord |>
-      dplyr::group_by(Admin2GUID) |>
-      dplyr::arrange(Admin2GUID, .by_group = TRUE) |>
-      dplyr::mutate(id = dplyr::row_number()) |>
-      dplyr::ungroup()
-
-    pt04 <- dplyr::full_join(pt03, pt02, by = c("Admin2GUID" = "GUID", "id"))
-
-    pt05 <- pt04 |>
-      dplyr::bind_cols(
-        dplyr::as_tibble(pt04$x),
-        sf::st_coordinates(pt04$x) |>
-          dplyr::as_tibble() |>
-          dplyr::rename("lon" = "X", "lat" = "Y")
-      ) |>
-      dplyr::select(-id)
-
-    pt05$x <- NULL
-    pt05$geometry <- NULL
-
-    df08 <- dplyr::bind_rows(df07, pt05)
-  } else {
-    df08 <- df07
-  }
-
-  # bind back placed point cases with df06 and finished
-  df09 <- df08 |>
-    dplyr::left_join(global.dist.01 |> dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME, ADM0_GUID, ADM1_GUID, GUID),
-      by = c("Admin0GUID" = "ADM0_GUID", "Admin1GUID" = "ADM1_GUID", "Admin2GUID" = "GUID")
-    ) |>
-    dplyr::mutate(
-      geo.corrected = ifelse(paste0("{", stringr::str_to_upper(admin2guid), "}", sep = "") != Admin2GUID, 1, 0),
-      geo.corrected = ifelse(paste0("{", stringr::str_to_upper(admin1guid), "}", sep = "") != Admin1GUID, 1, geo.corrected),
-      geo.corrected = ifelse(paste0("{", stringr::str_to_upper(admin0guid), "}", sep = "") != Admin0GUID, 1, geo.corrected),
-      place.admin.0 = ifelse((place.admin.0 != ADM0_NAME | is.na(place.admin.0)) & !is.na(ADM0_NAME), ADM0_NAME, place.admin.0),
-      place.admin.1 = ifelse((place.admin.1 != ADM1_NAME | is.na(place.admin.1)) & !is.na(ADM1_NAME), ADM1_NAME, place.admin.1),
-      place.admin.2 = ifelse((place.admin.2 != ADM2_NAME | is.na(place.admin.2)) & !is.na(ADM2_NAME), ADM2_NAME, place.admin.2)
-    ) |>
-    dplyr::select(-c(
-      "wrongAdmin0GUID", "wrongAdmin1GUID", "wrongAdmin2GUID", "ADM1_GUID", "ADM0_GUID", "ADM0_NAME",
-      "ADM1_NAME", "ADM2_NAME"
-    )) |>
-    dplyr::mutate(geo.corrected = ifelse(is.na(geo.corrected), 0, geo.corrected))
-
-  df09$Shape <- NULL
-
-  final.guid.check <- df09 |>
-    dplyr::filter((paste0("{", stringr::str_to_upper(admin2guid), "}", sep = "") != Admin2GUID |
-      paste0("{", stringr::str_to_upper(admin1guid), "}", sep = "") != Admin1GUID |
-      paste0("{", stringr::str_to_upper(admin0guid), "}", sep = "") != Admin0GUID) &
-      geo.corrected == 0) |>
-    dplyr::select(epid, yronset, place.admin.0, place.admin.1, place.admin.2, admin0guid, admin1guid, admin2guid, Admin0GUID, Admin1GUID, Admin2GUID, geo.corrected)
-
-
-  final.names.check <- df09 |>
-    dplyr::select(epid, yronset, place.admin.0, place.admin.1, place.admin.2, admin0guid, admin1guid, admin2guid, Admin0GUID, Admin1GUID, Admin2GUID, geo.corrected) |>
-    dplyr::filter((is.na(place.admin.0) & !is.na(admin0guid)) |
-      (is.na(place.admin.1) & !is.na(admin1guid)) |
-      (is.na(place.admin.2) & !is.na(admin2guid)))
-
-  if (nrow(final.guid.check) > 0 | nrow(final.names.check) > 0) {
-    cli::cli_alert_warning("A GUID or name has been misclassified, please run pre.stsample manually to identify")
-    stop()
-  } else {
-    rm(final.names.check, final.guid.check)
-  }
-
-  return(df09)
-}
-
 
 #' Function for data qa check in AFP line list cleaning
 #' @description function creates a new variable when combined with a mutate statement in R code
@@ -1853,7 +831,7 @@ archive_log <- function(log_file = Sys.getenv("POLIS_LOG_FILE"),
   log.current <- log |>
     dplyr::filter(time > log.time.to.arch)
 
-  # check existence of archived log and either create or rbind to it
+  # check existence of archived log and either create or bind_rows to it
   flag.log.exists <- tidypolis_io(
     io = "exists.file",
     file_path = file.path(polis_data_folder, "Log_Archive/log_archive.rds")
@@ -2003,7 +981,7 @@ create_response_vars <- function(pos,
     ) |>
     unique()
 
-  finished.responses <- rbind(type1, type2, type3) |>
+  finished.responses <- dplyr::bind_rows(type1, type2, type3) |>
     dplyr::group_by(epid, ntchanges, emergencegroup) |>
     dplyr::mutate(finished.responses = n()) |>
     dplyr::ungroup() |>
@@ -2232,7 +1210,7 @@ check_missingness <- function(data,
 #' @param polis_folder `str` location of the POLIS data folder
 #' @param output_format `str` output_format to save files as.
 #'    Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
-#'    'rds'.
+#'    'parquet'.
 #' @param who_region `str` optional WHO region to filter data
 #'      Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.
 #' @param archive Logical. Whether to archive previous output directories
@@ -2246,7 +1224,7 @@ check_missingness <- function(data,
 #'
 preprocess_cdc <- function(polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
                            who_region = NULL,
-                           output_format = "rds",
+                           output_format = "parquet",
                            archive = TRUE,
                            keep_n_archives = Inf) {
   cli::cli_h1("Step 0/5: Set-up preprocessing environment")
@@ -3088,12 +2066,12 @@ process_spatial <- function(gdb_folder,
   df.list <- list()
 
   for (i in startyr:endyr) {
-    df02 <- f.yrs.01(global.prov.01, i)
+    df02 <- sirfunctions:::f.yrs.01(global.prov.01, i)
 
     df.list[[i]] <- df02
   }
 
-  long.global.prov.01 <- do.call(rbind, df.list)
+  long.global.prov.01 <- dplyr::bind_rows(df.list)
   cli::cli_process_start("Evaluating overlapping province shapes")
 
   if (endyr == lubridate::year(format(Sys.time())) & startyr == 2000) {
@@ -3138,12 +2116,12 @@ process_spatial <- function(gdb_folder,
   df.list <- list()
 
   for (i in startyr:endyr) {
-    df02 <- f.yrs.01(global.dist.01, i)
+    df02 <- sirfunctions:::f.yrs.01(global.dist.01, i)
 
     df.list[[i]] <- df02
   }
 
-  long.global.dist.01 <- do.call(rbind, df.list)
+  long.global.dist.01 <- dplyr::bind_rows(df.list)
 
   cli::cli_process_start("Evaluating overlapping district shapes")
 
@@ -3198,11 +2176,12 @@ process_spatial <- function(gdb_folder,
 #'
 #' @param azcontainer Azure validated container object.
 #' @param proxy_data_loc str location of proxy_data on EDAV
-#' @param polis_pos_loc str location of latest positives dataset generated from POLIS API data
+#' @param polis_pos_loc str location of latest positives dataset generated from POLIS API data. This is located in
+#' /Data/polis and is a file name starting with "positives_2001-01-01".
 #' @keywords internal
 add_gpei_cases <- function(azcontainer = suppressMessages(get_azure_storage_connection()),
                            proxy_data_loc = "/Data/proxy/polio_proxy_data.csv",
-                           polis_pos_loc = "/Data/polis/positives_2001-01-01_2025-01-06.rds") {
+                           polis_pos_loc) {
   cli::cli_abort("This function is in draft and cannot be used at this time.")
 
   long.global.ctry <- sirfunctions::load_clean_ctry_sp(type = "long")
@@ -3435,7 +2414,7 @@ add_gpei_cases <- function(azcontainer = suppressMessages(get_azure_storage_conn
   }
 
   if (exists("proxy.data.prov.final") & exists("proxy.data.ctry.final")) {
-    proxy.data.final <- rbind(proxy.data.prov.final, proxy.data.ctry.final) |>
+    proxy.data.final <- dplyr::bind_rows(proxy.data.prov.final, proxy.data.ctry.final) |>
       dplyr::mutate(
         dateonset = as.Date(dateonset, format = "%m/%d/%Y"),
         report_date = as.Date(report_date, format = "%m/%d/%Y"),
@@ -3605,7 +2584,7 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Case")
   api_case_data <- s1_clean_case_table(
-    path = file.path(polis_data_folder, "case.rds"),
+    path = file.path(polis_data_folder, paste0("case", output_format)),
     crosswalk = crosswalk_data
   )
 
@@ -3623,7 +2602,7 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Environmental Samples")
   api_es_data <- s1_clean_es_table(
-    path = file.path(polis_data_folder, "environmental_sample.rds"),
+    path = file.path(polis_data_folder, paste0("environmental_sample", output_format)),
     crosswalk = crosswalk_data
   )
 
@@ -3641,7 +2620,7 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Virus")
   api_virus_data <- s1_clean_virus_table(
-    path = file.path(polis_data_folder, "virus.rds"),
+    path = file.path(polis_data_folder, paste0("virus", output_format)),
     crosswalk = crosswalk_data
   )
 
@@ -3659,8 +2638,8 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Activity")
   api_activity_data <- s1_clean_activity_table(
-    path = file.path(polis_data_folder, "activity.rds"),
-    subactivity_path = file.path(polis_data_folder, "sub_activity.rds"),
+    path = file.path(polis_data_folder, paste0("activity", output_format)),
+    subactivity_path = file.path(polis_data_folder, paste0("sub_activity", output_format)),
     crosswalk = crosswalk_data
   )
 
@@ -3678,7 +2657,7 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
 
   cli::cli_h2("Sub-activity")
   api_subactivity_data <- s1_clean_subactivity_table(
-    file.path(polis_data_folder, "sub_activity.rds"),
+    file.path(polis_data_folder, paste0("sub_activity", output_format)),
     api_activity_data,
     crosswalk_data,
     long.global.dist.01
@@ -3968,12 +2947,12 @@ s1_clean_es_table <- function(path, crosswalk,
         "%Y-%m-%d"
     ), format = "%d-%m-%Y"))) |>
     dplyr::mutate(`Sample Id` = as.character(`Sample Id`)) |>
-    dplyr::select(c(
+    dplyr::select(dplyr::any_of(c(
       crosswalk$Web_Name[crosswalk$Table %in% c("EnvSample") &
         !is.na(crosswalk$Web_Name)],
       crosswalk$API_Name[crosswalk$Table %in% c("EnvSample") &
         is.na(crosswalk$Web_Name)]
-    ))
+    )))
   cli::cli_process_done()
 
   rm(api_es_sub2)
@@ -4861,7 +3840,7 @@ s2_fully_process_afp_data <- function(polis_data_folder, polis_folder,
   )
 
   # Step 2g: Validate classifications
-  afp_validated <- s2_validate_classifications(data = afp_classified)
+  afp_validated <- s2_validate_classifications(data = afp_classified, output_folder_name)
   invisible(gc())
 
   # Step 2h: Validate and fix GUIDs
@@ -5096,7 +4075,7 @@ s2_check_duplicated_epids <- function(data, polis_data_folder, output_folder_nam
     update_polis_log(
       .event = paste0(
         "Duplicate AFP cases output in ",
-        "duplicate_AFPcases_Polis within ", output_folder_name,
+        "duplicate_AFPcases_Polis within ", output_folder_name
       ),
       .event_type = "ALERT"
     )
@@ -5155,30 +4134,12 @@ s2_standardize_dates <- function(data) {
       admin2guid = admin.2.guid
     ) |>
     dplyr::mutate(
-      dateonset = lubridate::ymd(
-        as.Date(date.onset, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      datenotify = lubridate::ymd(
-        as.Date(notification.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      dateinvest = lubridate::ymd(
-        as.Date(investigation.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      datestool1 = lubridate::ymd(
-        as.Date(stool.1.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      datestool2 = lubridate::ymd(
-        as.Date(stool.2.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      followup.date = lubridate::ymd(
-        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
+      dateonset = lubridate::as_date(date.onset),
+      datenotify = lubridate::as_date(notification.date),
+      dateinvest = lubridate::as_date(investigation.date),
+      datestool1 = lubridate::as_date(stool.1.collection.date),
+      datestool2 = lubridate::as_date(stool.2.collection.date),
+      followup.date = lubridate::as_date(followup.date),
       yronset = lubridate::year(dateonset),
       yronset = dplyr::if_else(is.na(yronset),
         lubridate::year(datestool1), yronset
@@ -5204,7 +4165,7 @@ s2_standardize_dates <- function(data) {
           "case.date", "stool.date.sent.to.lab",
           "clinical.admitted.date", "followup.date"
         )),
-        ~ lubridate::ymd(as.Date(., tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")), quiet = TRUE)
+        \(x)  lubridate::as_date(x)
       )
     ) |>
     dplyr::mutate(
@@ -5212,7 +4173,10 @@ s2_standardize_dates <- function(data) {
       casedate = case.date,
       stooltolabdate = stool.date.sent.to.lab,
       stooltoiclabdate = stool.date.sent.to.ic.lab,
-      clinicadmitdate = clinical.admitted.date
+      clinicadmitdate = clinical.admitted.date,
+      datecreated = lubridate::as_datetime(created.date),
+      datepublish = lubridate::as_datetime(publishdate),
+      dateupdated = lubridate::as_datetime(last.updated.date)
     )
 
   cli::cli_process_done()
@@ -5597,6 +4561,7 @@ s2_classify_afp_cases <- function(data, startyr = 2020,
 #' are in a predefined list of cases that have been manually reviewed.
 #'
 #' @param data `tibble` A tibble containing AFP data with classification columns
+#' @param output_folder_name `str` Folder to output EPIDs with issues.
 #'
 #' @returns The filtered tibble with invalid classifications removed
 #'
@@ -5609,7 +4574,7 @@ s2_classify_afp_cases <- function(data, startyr = 2020,
 #' Known issues are filtered against a predefined whitelist
 #'
 #' @keywords internal
-s2_validate_classifications <- function(data) {
+s2_validate_classifications <- function(data, output_folder_name) {
   cli::cli_process_start(
     paste0(
       "Verifying that classifications in data line up with ",
@@ -5645,10 +4610,10 @@ s2_validate_classifications <- function(data) {
       dplyr::pull(epid)
 
     # List of cases already flagged to POLIS that can be skipped
-    flagged_to_polis <- c("MOZ-TET-TSA-22-006")
+    #flagged_to_polis <- c("MOZ-TET-TSA-22-006")
 
     # Remove known cases from consideration
-    epids <- epids[!epids %in% flagged_to_polis]
+    #epids <- epids[!epids %in% flagged_to_polis]
 
     # If unknown "none" classifications remain, raise an error
     if (length(epids) > 0) {
@@ -5656,13 +4621,19 @@ s2_validate_classifications <- function(data) {
         "There is a 'none' classification, flag for POLIS ",
         "and get guidance on proper classification"
       ))
+      cli::cli_li(epids)
 
       update_polis_log(
         .event = "NONE classification found, must be manually addressed",
         .event_type = "ERROR"
       )
 
-      stop("Found 'none' classifications that must be addressed manually")
+      cli::cli_alert_info("Please see output afp_epids_none_classification.parquet for details")
+      tidypolis_io(to_check |>
+                     dplyr::filter(cdc.classification.all == "none"),
+                   io = "write",
+                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                         output_folder_name, "afp_epids_none_classification.parquet"))
     }
   }
 
@@ -5990,7 +4961,7 @@ s2_process_coordinates <- function(data, polis_data_folder, polis_folder,
     data_deduped <- dup_epid_fixed |>
       dplyr::select(-c("epid", "dup_epid")) |>
       dplyr::rename(epid = epid_fixed) |>
-      rbind(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
+      dplyr::bind_rows(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
 
 
     cli::cli_alert_warning(paste0(
@@ -6113,7 +5084,7 @@ s2_create_afp_variables <- function(data) {
       ),
       # Re-parse followup date to ensure consistency
       followup.date = lubridate::ymd(
-        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y"))
+        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"))
       ),
 
       # Additional date quality flags
@@ -8806,10 +7777,7 @@ s5_pos_create_cdc_vars <- function(virus.raw.new, polis_folder, polis_data_folde
       emergencegroup = `emergence.group(s)`,
       ntchanges = nt.changes,
       classificationvdpv = `vdpv.classification(s)`,
-      whoregion = who.region,
-      created_date = 'Created Date',
-      updated_date = 'Updated Date',
-      publish_date = 'Publish Date'
+      whoregion = who.region
     ) |>
     dplyr::mutate(
       dateonset = lubridate::ymd(virus.date),
@@ -8929,7 +7897,7 @@ s5_pos_check_duplicates <- function(virus.01, polis_data_folder, output_folder_n
   # Script below will stop further execution if there is a duplicate virus, with same onset date, virus type, emergence group, ntchanges
   if (nrow(virus.dup.01) >= 1) {
     cli::cli_alert_warning("Duplicate viruses in the virus table data. Check the data for duplicate records.
-          If they are the exact same, then contact Ashley")
+          If they are the exact same, then contact the POLIS team at polis@who.int")
     virus.dup.01 <- virus.dup.01[order(virus.dup.01$surveillance.type, virus.dup.01$virustype, virus.dup.01$yronset), ] |>
       dplyr::select(-virus_dup)
 
@@ -9002,7 +7970,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
       output_folder_name,
       "/"
     ), "")) |>
-    dplyr::filter(grepl(paste0("^(afp_linelist_2001-01-01_2025).*(\\", output_format, ")$"), short_name)) |>
+    dplyr::filter(grepl(paste0("^(afp_linelist_2001-01-01).*(\\", output_format, ")$"), short_name)) |>
     dplyr::pull(name)
 
   tryCatch(
@@ -9022,7 +7990,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
   non.afp.files.01 <- dplyr::tibble("name" = tidypolis_io(io = "list", file_path = file.path(polis_data_folder, output_folder_name), full_names = T)) |>
     dplyr::mutate(short_name = stringr::str_replace(name, paste0(polis_data_folder, "/", output_folder_name, "/"), "")) |>
     dplyr::filter(grepl(paste0(
-      "^(other_surveillance_type_linelist_2016_2025).*(\\",
+      "^(other_surveillance_type_linelist_2016).*(\\",
       output_format, ")$"
     ), short_name)) |>
     dplyr::pull(name)
@@ -9074,7 +8042,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
 
 
   # Combine AFP and other surveillance type cases
-  afp.02 <- rbind(afp.01, non.afp.01) |>
+  afp.02 <- dplyr::bind_rows(afp.01, non.afp.01) |>
     dplyr::select(epid, lat, lon, datenotificationtohq) |>
     dplyr::mutate(datenotificationtohq = parse_date_time(datenotificationtohq, c("%Y-%m-%d", "%d/%m/%Y")))
 
