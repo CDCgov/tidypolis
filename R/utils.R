@@ -5648,12 +5648,10 @@ s2_compare_with_archive <- function(data,
   ))
 
   # Harmonize column selections
-  cols_to_keep <- c("datecreated", "datepublish", "dateupdated")
-
   data_prepared <- data_prepared |>
     dplyr::ungroup() |>
     dplyr::select(-c(setdiff(
-      setdiff(colnames(data_prepared), c(col_afp_raw, cols_to_keep)),
+      setdiff(colnames(data_prepared), col_afp_raw),
       colnames(old_data)
     )))
 
