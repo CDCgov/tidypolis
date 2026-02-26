@@ -44,7 +44,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
       crs = sf::st_crs(global.dist.01)
     ))
 
-  global.dist.02 <- sf::st_make_valid(global.dist.01)
+  global.dist.02 <- global.dist.01
 
   # identify bad shape rows after make_valid
   check.dist.2 <- dplyr::as_tibble(sf::st_is_valid(global.dist.02))
