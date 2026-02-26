@@ -396,7 +396,7 @@ rename_via_crosswalk <- function(api_data,
   for (i in 1:nrow(crosswalk_sub1)) {
     api_name <- crosswalk_sub1$API_Name[i]
     web_name <- crosswalk_sub1$Web_Name[i]
-    if (!is.na(web_name) & web_name != "") {
+    if (!is.na(web_name) & web_name != "" & api_name %in% names(api_data)) {
       api_data <- api_data |>
         dplyr::rename({{ web_name }} := {{ api_name }})
     }
@@ -2972,12 +2972,12 @@ s1_clean_es_table <- function(path, crosswalk,
         "%Y-%m-%d"
     ), format = "%d-%m-%Y"))) |>
     dplyr::mutate(`Sample Id` = as.character(`Sample Id`)) |>
-    dplyr::select(c(
+    dplyr::select(dplyr::any_of(c(
       crosswalk$Web_Name[crosswalk$Table %in% c("EnvSample") &
         !is.na(crosswalk$Web_Name)],
       crosswalk$API_Name[crosswalk$Table %in% c("EnvSample") &
         is.na(crosswalk$Web_Name)]
-    ))
+    )))
   cli::cli_process_done()
 
   rm(api_es_sub2)
@@ -3865,7 +3865,7 @@ s2_fully_process_afp_data <- function(polis_data_folder, polis_folder,
   )
 
   # Step 2g: Validate classifications
-  afp_validated <- s2_validate_classifications(data = afp_classified)
+  afp_validated <- s2_validate_classifications(data = afp_classified, output_folder_name)
   invisible(gc())
 
   # Step 2h: Validate and fix GUIDs
@@ -4100,7 +4100,7 @@ s2_check_duplicated_epids <- function(data, polis_data_folder, output_folder_nam
     update_polis_log(
       .event = paste0(
         "Duplicate AFP cases output in ",
-        "duplicate_AFPcases_Polis within ", output_folder_name,
+        "duplicate_AFPcases_Polis within ", output_folder_name
       ),
       .event_type = "ALERT"
     )
@@ -4159,30 +4159,12 @@ s2_standardize_dates <- function(data) {
       admin2guid = admin.2.guid
     ) |>
     dplyr::mutate(
-      dateonset = lubridate::ymd(
-        as.Date(date.onset, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      datenotify = lubridate::ymd(
-        as.Date(notification.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      dateinvest = lubridate::ymd(
-        as.Date(investigation.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      datestool1 = lubridate::ymd(
-        as.Date(stool.1.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      datestool2 = lubridate::ymd(
-        as.Date(stool.2.collection.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
-      followup.date = lubridate::ymd(
-        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")),
-        quiet = TRUE
-      ),
+      dateonset = lubridate::as_date(date.onset),
+      datenotify = lubridate::as_date(notification.date),
+      dateinvest = lubridate::as_date(investigation.date),
+      datestool1 = lubridate::as_date(stool.1.collection.date),
+      datestool2 = lubridate::as_date(stool.2.collection.date),
+      followup.date = lubridate::as_date(followup.date),
       yronset = lubridate::year(dateonset),
       yronset = dplyr::if_else(is.na(yronset),
         lubridate::year(datestool1), yronset
@@ -4208,7 +4190,7 @@ s2_standardize_dates <- function(data) {
           "case.date", "stool.date.sent.to.lab",
           "clinical.admitted.date", "followup.date"
         )),
-        ~ lubridate::ymd(as.Date(., tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")), quiet = TRUE)
+        \(x)  lubridate::as_date(x)
       )
     ) |>
     dplyr::mutate(
@@ -4216,7 +4198,10 @@ s2_standardize_dates <- function(data) {
       casedate = case.date,
       stooltolabdate = stool.date.sent.to.lab,
       stooltoiclabdate = stool.date.sent.to.ic.lab,
-      clinicadmitdate = clinical.admitted.date
+      clinicadmitdate = clinical.admitted.date,
+      datecreated = lubridate::as_datetime(created.date),
+      datepublish = lubridate::as_datetime(publishdate),
+      dateupdated = lubridate::as_datetime(last.updated.date)
     )
 
   cli::cli_process_done()
@@ -4601,6 +4586,7 @@ s2_classify_afp_cases <- function(data, startyr = 2020,
 #' are in a predefined list of cases that have been manually reviewed.
 #'
 #' @param data `tibble` A tibble containing AFP data with classification columns
+#' @param output_folder_name `str` Folder to output EPIDs with issues.
 #'
 #' @returns The filtered tibble with invalid classifications removed
 #'
@@ -4613,7 +4599,7 @@ s2_classify_afp_cases <- function(data, startyr = 2020,
 #' Known issues are filtered against a predefined whitelist
 #'
 #' @keywords internal
-s2_validate_classifications <- function(data) {
+s2_validate_classifications <- function(data, output_folder_name) {
   cli::cli_process_start(
     paste0(
       "Verifying that classifications in data line up with ",
@@ -4649,10 +4635,10 @@ s2_validate_classifications <- function(data) {
       dplyr::pull(epid)
 
     # List of cases already flagged to POLIS that can be skipped
-    flagged_to_polis <- c("MOZ-TET-TSA-22-006")
+    #flagged_to_polis <- c("MOZ-TET-TSA-22-006")
 
     # Remove known cases from consideration
-    epids <- epids[!epids %in% flagged_to_polis]
+    #epids <- epids[!epids %in% flagged_to_polis]
 
     # If unknown "none" classifications remain, raise an error
     if (length(epids) > 0) {
@@ -4660,13 +4646,19 @@ s2_validate_classifications <- function(data) {
         "There is a 'none' classification, flag for POLIS ",
         "and get guidance on proper classification"
       ))
+      cli::cli_li(epids)
 
       update_polis_log(
         .event = "NONE classification found, must be manually addressed",
         .event_type = "ERROR"
       )
 
-      stop("Found 'none' classifications that must be addressed manually")
+      cli::cli_alert_info("Please see output afp_epids_none_classification.parquet for details")
+      tidypolis_io(to_check |>
+                     dplyr::filter(cdc.classification.all == "none"),
+                   io = "write",
+                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
+                                         output_folder_name, "afp_epids_none_classification.parquet"))
     }
   }
 
@@ -5117,7 +5109,7 @@ s2_create_afp_variables <- function(data) {
       ),
       # Re-parse followup date to ensure consistency
       followup.date = lubridate::ymd(
-        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y"))
+        as.Date(followup.date, tryFormats = c("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"))
       ),
 
       # Additional date quality flags
