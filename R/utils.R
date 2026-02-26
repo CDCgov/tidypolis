@@ -933,16 +933,14 @@ create_response_vars <- function(pos,
   # bring in processed SIA data
   path <- tidypolis_io(io = "list", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"), output_folder_name), full_names = T)
 
-  sia <- NULL
-  sia_path <- path[grepl("sia_2000", path)]
 
-  if (length(sia_path) > 0) {
   tryCatch(
     {
       sia <- tidypolis_io(io = "read", file_path = path[grepl("sia_2000", path)])
     },
     error = \(e) {
-      sia <- NULL
+      cli::cli_warn("sia_2000 missing...continuing.")
+
     }
   )
 
@@ -8005,8 +8003,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
     dplyr::filter(grepl(paste0("^(afp_linelist_2001-01-01).*(\\", output_format, ")$"), short_name)) |>
     dplyr::pull(name)
 
-  afp.01 <- NULL
-  if (length(afp.files.01) > 0) {
+
   tryCatch(
     {
       afp.01 <- lapply(afp.files.01, function(x) tidypolis_io(io = "read", file_path = x)) |>
@@ -8016,10 +8013,9 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
         dplyr::filter(dplyr::between(yronset, startyr, endyr))
     },
     error = \(e) {
-      cli::cli_warn("Please run Step 2 of preprocessing before Step 5.")
-    }
-  )
-}
+      cli::cli_warn("Missing other_surveillance_type_linelist_2016...continuing.")
+     }
+    )
 
   non.afp.files.01 <- dplyr::tibble("name" = tidypolis_io(io = "list", file_path = file.path(polis_data_folder, output_folder_name), full_names = T)) |>
     dplyr::mutate(short_name = stringr::str_replace(name, paste0(polis_data_folder, "/", output_folder_name, "/"), "")) |>
