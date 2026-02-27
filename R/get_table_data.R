@@ -603,15 +603,15 @@ get_table_data <- function(.table,
   filters <- c()
 
   if (whoregion != "all") {
-    filters <- c(filters, paste0("WHORegion eq '", whoregion, "'"))
+    filters <- c(filters, paste0("WHORegion", whoregion, "'"))
   }
 
   if (!is.null(start_date)) {
-    filters <- c(filters, paste0("ReportDate ge ", start_date))  # Adjust column name as needed
+    filters <- c(filters, paste0("ReportDate", start_date))  # Adjust column name as needed
   }
 
   if (!is.null(end_date)) {
-    filters <- c(filters, paste0("ReportDate le ", end_date))  # Adjust column name as needed
+    filters <- c(filters, paste0("ReportDate", end_date))  # Adjust column name as needed
   }
 
   if (length(filters) > 0) {
