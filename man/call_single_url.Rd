@@ -12,21 +12,10 @@ call_single_url(url, api_key = Sys.getenv("POLIS_API_KEY"), times = 10)
 \item{api_key}{\code{str} validated API key.}
 
 \item{times}{\code{int} Number of times to attempt connection with API.}
-
-\item{diagnostics}{\code{logical} Logging messages to see if calls are happening.}
 }
 \value{
-\code{tibble} Data from the response.
+\code{tibble} Dataset requested from the API.
 }
 \description{
-Call a return the formatted output from one URL.
-}
-\details{
-The function is designed for API endpoints that support skiptokens argument.
-}
-\examples{
-\dontrun{
-call_single_url("https://extranet.who.int/polis/api/v2/Virus?$filter=VirusDate\%20gt\%202025-01-01")
-}
-
+Call a return the formatted output frome one URL.
 }
