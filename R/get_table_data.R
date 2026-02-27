@@ -359,9 +359,9 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
         )
       )
 
-      # Chunk in case we need to download > 100 at a time. POLIS seems to struggle
+      # Chunk in case we need to download 50 at a time. POLIS seems to struggle
       # with it.
-      chunks <- split(missed.id |> dplyr::select(ids), ceiling(seq_along(missed.id$ids) / 100))
+      chunks <- split(missed.id |> dplyr::select(ids), ceiling(seq_along(missed.id$ids) / 50))
 
       missing_epids_data <- purrr::map(1:length(chunks), \(x) {
 
@@ -730,13 +730,15 @@ force_compile_raw_extract <- function(table_data) {
 #' [get_table_data()]. This will then get stored to the raw_extract folder for the
 #' particular table.
 #'
-#'
+#' @param chunk_size `int` Max number of records to call per call. Using too big of a chunk
+#' can cause issues with the API as the API call has a character length. Recommend not to
+#' change.
 #' @inheritParams update_polis_table
 #'
 #' @returns `NULL` invisibly
 #' @export
 #'
-fetch_missing_records <- function(table_data) {
+fetch_missing_records <- function(table_data, chunk_size = 50) {
 
   base_url <- "https://extranet.who.int/polis/api/v2/"
   table_url <- paste0(base_url, table_data$endpoint)
@@ -795,7 +797,7 @@ fetch_missing_records <- function(table_data) {
 
     # Chunk in case we need to download > 100 at a time. POLIS seems to struggle
     # with it.
-    chunks <- split(missed.id |> dplyr::select(ids), ceiling(seq_along(missed.id$ids) / 100))
+    chunks <- split(missed.id |> dplyr::select(ids), ceiling(seq_along(missed.id$ids) / 50))
 
     missing_epids_data <- purrr::map(1:length(chunks), \(x) {
 

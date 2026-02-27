@@ -4,10 +4,14 @@
 \alias{fetch_missing_records}
 \title{Get extract with missed records}
 \usage{
-fetch_missing_records(table_data)
+fetch_missing_records(table_data, chunk_size = 50)
 }
 \arguments{
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
+
+\item{chunk_size}{\code{int} Max number of records to call per call. Using too big of a chunk
+can cause issues with the API as the API call has a character length. Recommend not to
+change.}
 }
 \value{
 \code{NULL} invisibly
