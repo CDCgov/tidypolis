@@ -9,7 +9,7 @@ fetch_missing_records(
   ids = get_table_ids(table_data),
   parallel_calls = FALSE,
   old_cache = NULL,
-  chunk_size = 50
+  chunk_size = 20
 )
 }
 \arguments{
