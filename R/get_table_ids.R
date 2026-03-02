@@ -33,7 +33,11 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
       response <- call_urls(urls)
     }
 
-    ids <- response |> dplyr::pull(table_data$polis_id)
+    if (nrow(response) == 0) {
+      ids <- response |> dplyr::pull(table_data$polis_id)
+    } else {
+      ids <- NA
+    }
 
     cli::cli_process_done()
 
