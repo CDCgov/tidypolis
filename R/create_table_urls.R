@@ -120,8 +120,8 @@ create_table_urls <- function(api_url, table_data, days_intervals = 7) {
       date_intervals <- week_cuts_api("2000-01-01T00:00:00Z", table_data$polis_update_id, 365)
     }
 
-    urls <- paste0(api_url, "?$filter=", date_intervals)
-    urls <- gsub(" ", "+", urls)
+    urls <- paste0(api_url, "&$filter=", date_intervals)
+    urls <- gsub(" ", "%20", urls)
     return(urls)
   } else {
     # IM and LQAS are the tables that need to be downloaded in full because they
