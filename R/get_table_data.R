@@ -305,7 +305,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       cache_file = Sys.getenv("POLIS_CACHE_FILE"),
       .table = table_data$table,
       .nrow = nrow(updated_cache),
-      .update_val = max(lubridate::as_datetime(dplyr::pull(out[table_data$polis_update_id])))
+      .update_val = max(lubridate::as_datetime(dplyr::pull(updated_cache[table_data$polis_update_id])))
     )
     cli::cli_process_done()
 
@@ -650,14 +650,14 @@ fetch_missing_records <- function(table_data,
                                   ids = get_table_ids(table_data),
                                   parallel_calls = FALSE,
                                   old_cache = NULL,
-                                  chunk_size = 50) {
+                                  chunk_size = 20) {
 
   base_url <- "https://extranet.who.int/polis/api/v2/"
   table_url <- paste0(base_url, table_data$endpoint)
 
   # check ids and make list of ids to be deleted
   cli::cli_process_start("Getting table Ids")
-  ids <- get_table_ids(table_data, parallel_calls)
+  ids <- get_table_ids(table_data, parallel_calls = parallel_calls)
   cli::cli_process_done()
 
   # Load in cache
