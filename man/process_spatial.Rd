@@ -5,9 +5,9 @@
 \title{A function to process WHO spatial datasets}
 \usage{
 process_spatial(
-  gdb_folder,
-  output_folder,
-  edav,
+  gdb_folder = "GID/PEB/SIR/Data/spatial/WHO_POLIO_GLOBAL_GEODATABASE.gdb",
+  output_folder = "GID/PEB/SIR/Data/spatial",
+  edav = TRUE,
   azcontainer = suppressMessages(sirfunctions::get_azure_storage_connection())
 )
 }

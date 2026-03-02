@@ -21,9 +21,9 @@
 #'   edav = T
 #' )
 #' }
-process_spatial <- function(gdb_folder,
-                            output_folder,
-                            edav,
+process_spatial <- function(gdb_folder = "GID/PEB/SIR/Data/spatial/WHO_POLIO_GLOBAL_GEODATABASE.gdb",
+                            output_folder = "GID/PEB/SIR/Data/spatial",
+                            edav = TRUE,
                             azcontainer = suppressMessages(sirfunctions::get_azure_storage_connection())) {
   if (!requireNamespace("utils", quietly = TRUE)) {
     stop('Package "utils" must be installed to use this function.',
@@ -36,6 +36,7 @@ process_spatial <- function(gdb_folder,
   }
 
   cli::cli_process_start("Loading raw spatial data")
+
   if (edav) {
     if (!requireNamespace("AzureStor", quietly = TRUE)) {
       stop('Package "AzureStor" must be installed to run process_spatial() on EDAV.',
@@ -43,82 +44,60 @@ process_spatial <- function(gdb_folder,
       )
     }
 
-    dest <- tempdir()
-    AzureStor::storage_download(container = azcontainer, gdb_folder, paste0(dest, "/gdb.zip"), overwrite = T)
+    withr::with_tempdir({
+        AzureStor::storage_multidownload(container = azcontainer,
+                                         src = paste0(gdb_folder, "/*"),
+                                         dest = "~/geodatabase.gdb",
+                                         overwrite = T)
 
-    utils::unzip(zipfile = paste0(dest, "/gdb.zip"), exdir = dest)
+        # Country shapes EDAV===============
+        global.ctry.01 <- sf::st_read(dsn = "geodatabase.gdb", layer = "GLOBAL_ADM0")
 
-    # Country shapes EDAV===============
-    global.ctry.01 <- sf::st_read(
-      dsn = stringr::str_remove(paste0(dest, "/", sub(".*\\/", "", gdb_folder)), ".zip"),
-      layer = "GLOBAL_ADM0"
-    ) |>
-      dplyr::mutate(
-        STARTDATE = as.Date(STARTDATE),
-        ENDDATE = as.Date(ENDDATE),
-        yr.st = lubridate::year(STARTDATE),
-        yr.end = lubridate::year(ENDDATE),
-        ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
-      )
+        # Province shapes EDAV===============
+        global.prov.01 <- sf::st_read(dsn = "geodatabase.gdb", layer = "GLOBAL_ADM1")
 
-    # Province shapes EDAV===============
-    global.prov.01 <- sf::st_read(
-      dsn = stringr::str_remove(paste0(dest, "/", sub(".*\\/", "", gdb_folder)), ".zip"),
-      layer = "GLOBAL_ADM1"
-    ) |>
-      dplyr::mutate(
-        STARTDATE = as.Date(STARTDATE),
-        ENDDATE = as.Date(ENDDATE),
-        yr.st = lubridate::year(STARTDATE),
-        yr.end = lubridate::year(ENDDATE),
-        ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
-      )
+        # District shapes EDAV===============
+        global.dist.01 <- sf::st_read(dsn = "geodatabase.gdb", layer = "GLOBAL_ADM2")
+        })
 
-    # District shapes EDAV===============
-    global.dist.01 <- sf::st_read(
-      dsn = stringr::str_remove(paste0(dest, "/", sub(".*\\/", "", gdb_folder)), ".zip"),
-      layer = "GLOBAL_ADM2"
-    ) |>
-      dplyr::mutate(
-        STARTDATE = as.Date(STARTDATE),
-        ENDDATE = as.Date(ENDDATE),
-        yr.st = lubridate::year(STARTDATE),
-        yr.end = lubridate::year(ENDDATE),
-        ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
-      )
-
-    unlink(dest)
   } else {
     # Country shapes local===============
-    global.ctry.01 <- sf::st_read(dsn = gdb_folder, layer = "GLOBAL_ADM0") |>
-      dplyr::mutate(
-        STARTDATE = as.Date(STARTDATE),
-        ENDDATE = as.Date(ENDDATE),
-        yr.st = lubridate::year(STARTDATE),
-        yr.end = lubridate::year(ENDDATE),
-        ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
-      )
+    global.ctry.01 <- sf::st_read(dsn = gdb_folder, layer = "GLOBAL_ADM0")
 
     # Province shapes local===============
-    global.prov.01 <- sf::st_read(dsn = gdb_folder, layer = "GLOBAL_ADM1") |>
-      dplyr::mutate(
-        STARTDATE = as.Date(STARTDATE),
-        ENDDATE = as.Date(ENDDATE),
-        yr.st = lubridate::year(STARTDATE),
-        yr.end = lubridate::year(ENDDATE),
-        ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
-      )
+    global.prov.01 <- sf::st_read(dsn = gdb_folder, layer = "GLOBAL_ADM1")
 
     # District shapes local===============
-    global.dist.01 <- sf::st_read(dsn = gdb_folder, layer = "GLOBAL_ADM2") |>
-      dplyr::mutate(
-        STARTDATE = as.Date(STARTDATE),
-        ENDDATE = as.Date(ENDDATE),
-        yr.st = lubridate::year(STARTDATE),
-        yr.end = lubridate::year(ENDDATE),
-        ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
-      )
+    global.dist.01 <- sf::st_read(dsn = gdb_folder, layer = "GLOBAL_ADM2")
   }
+
+  global.ctry.01 <- global.ctry.01 |>
+    dplyr::mutate(
+      STARTDATE = as.Date(STARTDATE),
+      ENDDATE = as.Date(ENDDATE),
+      yr.st = lubridate::year(STARTDATE),
+      yr.end = lubridate::year(ENDDATE),
+      ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
+    )
+
+  global.prov.01 <- global.prov.01 |>
+    dplyr::mutate(
+      STARTDATE = as.Date(STARTDATE),
+      ENDDATE = as.Date(ENDDATE),
+      yr.st = lubridate::year(STARTDATE),
+      yr.end = lubridate::year(ENDDATE),
+      ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
+    )
+
+  global.dist.01 <- global.dist.01 |>
+    dplyr::mutate(
+      STARTDATE = as.Date(STARTDATE),
+      ENDDATE = as.Date(ENDDATE),
+      yr.st = lubridate::year(STARTDATE),
+      yr.end = lubridate::year(ENDDATE),
+      ADM0_NAME = ifelse(stringr::str_detect(ADM0_NAME, "IVOIRE"), "COTE D IVOIRE", ADM0_NAME)
+    )
+
   cli::cli_process_done()
 
   # identify sf var in global.ctry
