@@ -640,7 +640,7 @@ force_compile_raw_extract <- function(table_data) {
 #' Attempts to download an extract of records missed by a previous run of
 #' [get_table_data()]. This will then get stored to the raw_extract folder for the
 #' particular table.
-#' @param ids `str` Full IDs of a table. Defaults to [get_table_ids()].
+#' @param ids `str` Full IDs of a table. When `NULL`, which obtains IDs by running [get_table_ids()] internally.
 #' @param chunk_size `int` Max number of records to call per call. Using too big of a chunk
 #' can cause issues with the API as the API call has a character length. Recommend not to
 #' change.
@@ -651,7 +651,7 @@ force_compile_raw_extract <- function(table_data) {
 #' @export
 #'
 fetch_missing_records <- function(table_data,
-                                  ids = get_table_ids(table_data),
+                                  ids = NULL,
                                   parallel_calls = FALSE,
                                   old_cache = NULL,
                                   chunk_size = 20) {
@@ -659,10 +659,13 @@ fetch_missing_records <- function(table_data,
   base_url <- "https://extranet.who.int/polis/api/v2/"
   table_url <- paste0(base_url, table_data$endpoint)
 
-  # check ids and make list of ids to be deleted
-  cli::cli_process_start("Getting table Ids")
-  ids <- get_table_ids(table_data, parallel_calls = parallel_calls)
-  cli::cli_process_done()
+  if (is.null(ids)) {
+
+    # check ids and make list of ids to be deleted
+    cli::cli_process_start("Getting table Ids")
+    ids <- get_table_ids(table_data, parallel_calls = FALSE)
+    cli::cli_process_done()
+  }
 
   # Load in cache
   if (is.null(old_cache)) {
