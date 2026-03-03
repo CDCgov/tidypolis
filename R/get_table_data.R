@@ -298,6 +298,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     # Final de-dup step for the updated cache
     updated_cache <- updated_cache |>
+      dplyr::collect() |>
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
       dplyr::slice_max(order_by = !!dplyr::sym(table_data$polis_update_id), n = 1, with_ties = FALSE) |>
       dplyr::ungroup() |>
@@ -756,7 +757,6 @@ fetch_missing_records <- function(table_data,
 
     # Join back to get full rows that match the latest date
     updated_cache <- updated_cache |>
-      dplyr::collect() |>
       dplyr::inner_join(latest_dates)
 
     return (updated_cache) #deduped and already a tibble
@@ -764,6 +764,7 @@ fetch_missing_records <- function(table_data,
   } else {
 
     return(old_cache) # deduped and already a tibble
+
   }
 
 }
