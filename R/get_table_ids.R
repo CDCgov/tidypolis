@@ -17,17 +17,24 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
     # Variables: URL, Token, Filters, ...
     polis_api_root_url <- "https://extranet.who.int/polis/api/v2/"
 
-    api_url <-
-      paste0(
-        polis_api_root_url,
-        table_data$endpoint,
-        "?$select=Id,",
-        table_data$polis_id
-      )
-
     if (parallel_calls == FALSE) {
+      api_url <-
+        paste0(
+          polis_api_root_url,
+          table_data$endpoint,
+          "?$select=Id,",
+          table_data$polis_id
+        )
       response <- call_single_url(api_url)
     } else {
+      api_url <-
+        paste0(
+          polis_api_root_url,
+          table_data$endpoint,
+          "?$select=Id,",
+          table_data$polis_update_id, ",",
+          table_data$polis_id
+        )
       table_data$polis_update_value[1] <- NA # force to download from 2000
       urls <- create_table_urls(api_url, table_data, 730)
       response <- call_urls(urls)
