@@ -37,10 +37,11 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
         )
       table_data$polis_update_value[1] <- NA # force to download from 2000
       urls <- create_table_urls(api_url, table_data, 730)
+      urls <- stringr::str_replace_all(urls, stringr::fixed("?$filter"), stringr::fixed("&$filter"))
       response <- call_urls(urls)
     }
 
-    if (nrow(response) == 0) {
+    if (nrow(response) != 0) {
       ids <- response |> dplyr::pull(table_data$polis_id)
     } else {
       ids <- NA
