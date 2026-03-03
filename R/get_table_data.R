@@ -227,7 +227,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     }
 
     # check ids and make list of ids to be deleted
-    cli::cli_process_start("Getting table Ids")
+    cli::cli_process_start("Getting table IDs to check for deleted IDs")
     ids <- get_table_ids(table_data, parallel_calls = FALSE)
     cli::cli_process_done()
 
@@ -246,13 +246,13 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     # Compute latest date per id (lazy until collect)
     latest_dates <- old_cache |>
+      dplyr::collect() |>
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
       summarize(updated_date = max(!!dplyr::sym(table_data$polis_update_id), na.rm = TRUE)) |>
       dplyr::ungroup()
 
     # Rename the updated date column
     latest_dates <- latest_dates |>
-      dplyr::collect() |>
       dplyr::rename_with(recode,
                     updated_date = table_data$polis_update_id)
 
@@ -302,7 +302,8 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
       dplyr::slice_max(order_by = !!dplyr::sym(table_data$polis_update_id), n = 1, with_ties = FALSE) |>
       dplyr::ungroup() |>
-      dplyr::distinct()
+      dplyr::distinct() |>
+      dplyr::filter(!(!!dplyr::sym(table_data$polis_update_id) %in% deleted_ids)) # Remove deleted IDs
 
     cli::cli_process_start("Updating cache log")
     update_polis_cache(
