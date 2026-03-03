@@ -31,6 +31,8 @@ process_spatial <- function(gdb_folder = "GID/PEB/SIR/Data/spatial/WHO_POLIO_GLO
     )
   }
 
+  is_zipped <- endsWith(gdb_folder, ".zip")
+
   if (edav) {
     output_folder <- stringr::str_replace(output_folder, paste0("GID/PEB/SIR/"), "")
   }
@@ -45,19 +47,38 @@ process_spatial <- function(gdb_folder = "GID/PEB/SIR/Data/spatial/WHO_POLIO_GLO
     }
 
     withr::with_tempdir({
+
+
+      # Work within the temp directory
+      tmp <- getwd()
+      zip_path <- file.path(tmp, "geodatabase.gdb.zip")
+
+      if (is_zipped) {
+        AzureStor::storage_download(container = azcontainer,
+                                    src = gdb_folder,
+                                    dest = zip_path,
+                                    overwrite = TRUE)
+
+        utils::unzip(zip_path, exdir = tmp)
+        dsn_name <- file.path("geodatabase.gdb", "geodatabase.gdb") # because zip files are nested
+
+      } else {
+
         AzureStor::storage_multidownload(container = azcontainer,
                                          src = paste0(gdb_folder, "/*"),
-                                         dest = "~/geodatabase.gdb",
-                                         overwrite = T)
+                                         dest = file.path(tmp, "geodatabase.gdb"),
+                                         overwrite = TRUE)
+        dsn_name <- "geodatabase.gdb"
+      }
 
         # Country shapes EDAV===============
-        global.ctry.01 <- sf::st_read(dsn = "geodatabase.gdb", layer = "GLOBAL_ADM0")
+        global.ctry.01 <- sf::st_read(dsn = dsn_name, layer = "GLOBAL_ADM0")
 
         # Province shapes EDAV===============
-        global.prov.01 <- sf::st_read(dsn = "geodatabase.gdb", layer = "GLOBAL_ADM1")
+        global.prov.01 <- sf::st_read(dsn = dsn_name, layer = "GLOBAL_ADM1")
 
         # District shapes EDAV===============
-        global.dist.01 <- sf::st_read(dsn = "geodatabase.gdb", layer = "GLOBAL_ADM2")
+        global.dist.01 <- sf::st_read(dsn = dsn_name, layer = "GLOBAL_ADM2")
         })
 
   } else {
