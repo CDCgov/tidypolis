@@ -6,7 +6,7 @@
 \usage{
 fetch_missing_records(
   table_data,
-  ids = get_table_ids(table_data),
+  ids = NULL,
   parallel_calls = FALSE,
   old_cache = NULL,
   chunk_size = 20
@@ -15,7 +15,7 @@ fetch_missing_records(
 \arguments{
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
 
-\item{ids}{\code{str} Full IDs of a table. Defaults to \code{\link[=get_table_ids]{get_table_ids()}}.}
+\item{ids}{\code{str} Full IDs of a table. When \code{NULL}, which obtains IDs by running \code{\link[=get_table_ids]{get_table_ids()}} internally.}
 
 \item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
 
