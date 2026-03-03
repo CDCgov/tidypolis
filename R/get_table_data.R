@@ -186,7 +186,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     " gt ",
     sub(" ", "T", as.character(table_data$polis_update_value)), "Z")
 
-  time_modifier <- gsub(" ", "+", time_modifier)
+  time_modifier <- gsub(" ", "%20", time_modifier)
   table_size <- get_table_size(.table = table_data$table, extra_filter = time_modifier)
 
   cli::cli_alert_success(paste0(
@@ -233,6 +233,9 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     # Get full size of the table and the table IDs
     full_table_size <- get_table_size(table_data$table)
+
+    # Compare numbers of ids and full table size
+    diff <- length(ids) - full_table_size
 
     # Load in cache
     cli::cli_process_start("Loading existing cache")
