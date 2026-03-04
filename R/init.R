@@ -147,21 +147,21 @@ init_tidypolis <- function(
     cache_tibble <- dplyr::tibble(
       "table" = c(
         "cache", "virus", "case", "human_specimen", "environmental_sample",
-        "activity", "sub_activity", "lqas", "im", "population", "geography",
+        "activity", "sub_activity", "lqas", "im", "geography",
         "synonym", "indicator", "reference_data", "pop"
       ),
       "endpoint" = c(
         "cache", "Virus", "Case", "LabSpecimen", "EnvSample", "Activity",
-        "SubActivity", "Lqas", "Im", "Population", "Geography", "Synonym", "IndicatorValue",
+        "SubActivity", "Lqas", "Im", "Geography", "Synonym", "IndicatorValue",
         "RefData", "Population"
       ),
       "polis_id" = c(
         NA, "VirusId", "CaseManualEditId", "SpecimenId", "EnviroSampleManualEditId", "SubActivityId", "SubActivityByAdmin2Id",
-        "LqasId", "ImId", "FK_GeoplaceId", "PlaceId", NA, NA, NA, "Id"
+        "LqasId", "ImId", "PlaceId", NA, NA, NA, NA
       ),
       "polis_update_id" = c(
         NA, "UpdatedDate", "LastUpdateDate", "LastUpdateDate", "LastUpdateDate", "LastUpdateDate", "UpdatedDate",
-        NA, NA, "UpdatedDate", "UpdatedDate", NA, NA, NA, NA
+        NA, NA, "UpdatedDate", NA, NA, NA, NA
       ),
       "nrow" = NA
     ) |>
