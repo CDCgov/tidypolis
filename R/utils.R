@@ -2842,6 +2842,49 @@ s1_clean_case_table <- function(path, crosswalk,
   api_case_sub3 <- remove_empty_columns(api_case_sub3)
   cli::cli_process_done()
 
+  cli::cli_process_start("Checking for Contact epids classified as AFP")
+  #Temporary location (Will update to edav location)
+  output_dir <- "C:/Users/uhx0/Downloads/afp_contacts_count.csv"  # change later
+
+  afp_contacts_count<- api_case_sub3 |>
+    dplyr::mutate(
+      Year = lubridate::year(as.Date(.data[["Case Date"]])),
+      EPID = as.character(EPID),
+      Stool2_chr = trimws(as.character(.data[["Stool 2 Collection Date"]]))
+    ) |>
+    dplyr::filter(
+      .data[["Surveillance Type"]] == "AFP",
+      stringr::str_detect(
+        EPID,
+        stringr::regex("(HC\\d+|CC\\d+|C\\d+)$", ignore_case = TRUE)
+      ),
+      is.na(.data[["Stool 2 Collection Date"]]) | Stool2_chr == ""
+    ) |>
+    dplyr::select(
+      `Place Admin 0`,
+      Year,
+      EPID,
+      `Surveillance Type`,
+      `Case Date`,
+      `Stool 1 Collection Date`,
+      `Stool 2 Collection Date`
+    ) |>
+    dplyr::arrange(`Place Admin 0`, Year, EPID)
+
+  if (nrow(afp_contacts_count) > 0) {
+    output_file <- file.path(
+      output_dir,
+      paste0("afp_contacts_count", format(Sys.Date(), "%Y-%m-%d"), ".csv")
+    )
+    readr::write_csv(afp_contacts_count, output_file)
+    cli::cli_alert_warning(paste0(
+      "AFP check: Found ", nrow(afp_contacts_count),
+      " records. CSV saved to: ", output_file
+    ))
+  } else {
+    cli::cli_alert_success("AFP check: No matches found.")
+  }
+
   return(api_case_sub3)
 }
 
