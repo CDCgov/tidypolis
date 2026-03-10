@@ -2082,20 +2082,6 @@ preprocess_cdc <- function(polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
     tidypolis_io(io = "create", file_path = core_files_folder_path)
   }
 
-  # Check for required static files
-  missing_static_files <- check_missing_static_files(core_files_folder_path)
-  if (length(missing_static_files) > 0) {
-    cli::cli_alert_warning(paste0(
-      "Please request the following file(s) from the SIR team",
-      "and move them into: ", core_files_folder_path
-    ))
-    for (file in missing_static_files) {
-      cli::cli_alert_info(paste0(file, "\n"))
-    }
-    cli::cli_alert_warning("Continuing execution of preprocessing with missing files.")
-  }
-  rm(core_files_folder_path, missing_static_files)
-
 
   # Step 1 - Basic cleaning and crosswalk ======
   cli::cli_h1("Step 1/5: Basic cleaning and crosswalk across datasets")
@@ -6123,38 +6109,43 @@ s2_export_afp_outputs <- function(data, latest_archive, polis_data_folder,
     dplyr::filter(grepl(paste0("^.*(afp_linelist).*(\\", output_format, ")$"), name)) |>
     dplyr::pull(name)
 
-  afp_files_combine <- dplyr::tibble("name" = tidypolis_io(
-    io = "list",
-    file_path = paste0(polis_data_folder, "/core_files_to_combine"),
-    full_names = TRUE
-  )) |>
-    dplyr::filter(grepl("^.*(afp_linelist).*(.rds)$", name)) |>
-    dplyr::pull(name)
+  # Optional combine folder AFP files (core_files_to_combine)
+  core_combine_path <- file.path(polis_data_folder, "core_files_to_combine")
+  afp_files_combine <- character(0)
 
-  # Combine AFP files
+  if (tidypolis_io(io = "exists.dir", file_path = core_combine_path)) {
+    afp_files_combine <- dplyr::tibble("name" = tidypolis_io(
+      io = "list",
+      file_path = core_combine_path,
+      full_names = TRUE
+    )) |>
+      dplyr::filter(grepl("^.*(afp_linelist).*(\\.rds)$", name)) |>
+      dplyr::pull(name)
+  }
+
+  if (length(afp_files_main) == 0) {
+    cli::cli_alert_warning("No AFP files found in {file.path(polis_data_folder, output_folder_name)}; skipping AFP combine/export.")
+  } else {
+
+  afp_new <- purrr::map_df(afp_files_main, ~ tidypolis_io(io = "read", file_path = .x))
+
+  # Read optional AFP combine files (only if present)
   if (length(afp_files_combine) > 0) {
-    invisible(capture.output(
-      afp_to_combine <- purrr::map_df(afp_files_combine, ~ tidypolis_io(
-        io = "read",
-        file_path = .x
-      )) |>
-        dplyr::mutate(
-          stool1tostool2 = as.numeric(stool1tostool2),
-          datenotificationtohq = lubridate::parse_date_time(
-            datenotificationtohq,
-            c("dmY", "bY", "Ymd", "%Y-%m-%d %H:%M:%S")
-          )
-        )
-    ))
-
-    invisible(capture.output(
-      afp_new <- purrr::map_df(
-        afp_files_main,
-        ~ tidypolis_io(io = "read", file_path = .x)
-      )
-    ))
-
+    afp_to_combine <- purrr::map_df(afp_files_combine, ~ tidypolis_io(io = "read", file_path = .x))
     afp_combined <- dplyr::bind_rows(afp_new, afp_to_combine)
+  } else {
+    afp_combined <- afp_new
+  }
+
+  afp_combined <- afp_combined |>
+    dplyr::mutate(
+      stool1tostool2 = as.numeric(stool1tostool2),
+      datenotificationtohq = lubridate::parse_date_time(
+        datenotificationtohq,
+        c("dmY", "bY", "Ymd", "%Y-%m-%d %H:%M:%S")
+      )
+    )
+
 
     # Export combined AFP dataset
     invisible(capture.output(
