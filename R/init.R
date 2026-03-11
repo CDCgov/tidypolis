@@ -5,7 +5,7 @@
 #' tidycensus process for managing their API secrets.
 #'
 #' @param polis_folder `str` Location of folder where to store all information from POLIS.
-#' @param edav `logical` Should the system use EDAV as it's cache; default `FALSE`.
+#' @param edav `logical` Should the system use EDAV as it's cache; default `TRUE`.
 #' @param api_debug boolean: if true will log all api calls
 #' @returns Messages on process.
 #' @examples
@@ -21,8 +21,8 @@
 #' @export
 init_tidypolis <- function(
     polis_folder = "POLIS",
-    edav = F,
-    api_debug = F) {
+    edav = TRUE,
+    api_debug = FALSE) {
   if (api_debug) {
     Sys.setenv("API_DEBUG" = TRUE)
   } else {
