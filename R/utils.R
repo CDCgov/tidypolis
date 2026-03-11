@@ -8408,6 +8408,107 @@ s5_pos_compare_with_archive <- function(afp.es.virus.01, afp.es.virus.03, polis_
     in_new_and_old_but_modified <- list()
   }
 
+  # ------------------------------------------------------------
+  # Virus-level presence checks (archive vs most recent)
+  # ------------------------------------------------------------
+
+  # Define the "virus key" (adjust columns if your canonical virus identifier differs)
+  new_virus_set <- afp.es.virus.03 |>
+    dplyr::mutate(
+      virustype = stringr::str_squish(as.character(virustype)),
+      measurement = stringr::str_squish(as.character(measurement))
+    ) |>
+    dplyr::distinct(virustype, measurement) |>
+    dplyr::filter(!is.na(virustype) | !is.na(measurement)) |>
+    dplyr::mutate(source = "most_recent")
+
+  old_virus_set <- old.pos |>
+    dplyr::mutate(
+      virustype = stringr::str_squish(as.character(virustype)),
+      measurement = stringr::str_squish(as.character(measurement))
+    ) |>
+    dplyr::distinct(virustype, measurement) |>
+    dplyr::filter(!is.na(virustype) | !is.na(measurement)) |>
+    dplyr::mutate(source = "archive")
+
+  # Virus types present in archive but not present now
+  virus_in_archive_not_in_recent <- old_virus_set |>
+    dplyr::select(-source) |>
+    dplyr::anti_join(new_virus_set |>
+                       dplyr::select(-source),
+                     by = c("virustype", "measurement"))
+
+  # Virus types present now but not present in archive
+  virus_in_recent_not_in_archive <- new_virus_set |>
+    dplyr::select(-source) |>
+    dplyr::anti_join(old_virus_set |>
+                       dplyr::select(-source),
+                     by = c("virustype", "measurement"))
+
+  # Optional: include simple counts for context (how many records carry each virus key)
+  new_virus_counts <- afp.es.virus.03 |>
+    dplyr::mutate(
+      virustype = stringr::str_squish(as.character(virustype)),
+      measurement = stringr::str_squish(as.character(measurement))
+    ) |>
+    dplyr::count(virustype, measurement, name = "n_records_recent")
+
+  old_virus_counts <- old.pos |>
+    dplyr::mutate(
+      virustype = stringr::str_squish(as.character(virustype)),
+      measurement = stringr::str_squish(as.character(measurement))
+    ) |>
+    dplyr::count(virustype, measurement, name = "n_records_archive")
+
+  virus_in_archive_not_in_recent <- virus_in_archive_not_in_recent |>
+    dplyr::left_join(old_virus_counts, by = c("virustype", "measurement"))
+
+  virus_in_recent_not_in_archive <- virus_in_recent_not_in_archive |>
+    dplyr::left_join(new_virus_counts, by = c("virustype", "measurement"))
+
+  # Log + export
+  if (nrow(virus_in_recent_not_in_archive) > 0) {
+    update_polis_log(
+      .event = paste0(
+        "Virus types present in MOST RECENT but not in ARCHIVE: ",
+        nrow(virus_in_recent_not_in_archive),
+        " (see virus_types_in_recent_not_in_archive.csv)"
+      ),
+      .event_type = "ALERT"
+    )
+
+    tidypolis_io(
+      obj = virus_in_recent_not_in_archive,
+      io = "write",
+      file_path = file.path(
+        polis_data_folder,
+        output_folder_name,
+        "virus_types_in_recent_not_in_archive.csv"
+      )
+    )
+  }
+
+  if (nrow(virus_in_archive_not_in_recent) > 0) {
+    update_polis_log(
+      .event = paste0(
+        "Virus types present in ARCHIVE but not in MOST RECENT: ",
+        nrow(virus_in_archive_not_in_recent),
+        " (see virus_types_in_archive_not_in_recent.csv)"
+      ),
+      .event_type = "ALERT"
+    )
+
+    tidypolis_io(
+      obj = virus_in_archive_not_in_recent,
+      io = "write",
+      file_path = file.path(
+        polis_data_folder,
+        output_folder_name,
+        "virus_types_in_archive_not_in_recent.csv"
+      )
+    )
+  }
+
   # identify updated viruses logging change from VDPV to cVDPV
   class.updated <- afp.es.virus.01 |>
     dplyr::filter(vdpvclassificationchangedate <= Sys.Date() & vdpvclassificationchangedate > (Sys.Date() - 7)) |>
