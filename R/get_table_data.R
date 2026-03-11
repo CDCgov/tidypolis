@@ -202,7 +202,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       out_n <- 0
 
     } else {
-      days_interval <- ifelse(parallel_calls, 7, NULL)
+      days_interval <- ifelse(parallel_calls, 7, NA)
       urls <- create_table_urls(table_url, table_data, days_interval)
 
       cli::cli_process_start("Downloading data")

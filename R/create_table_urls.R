@@ -104,7 +104,7 @@ create_table_urls <- function(api_url, table_data, days_intervals = 7) {
                        "activity", "sub_activity", "population")
   with_update_date <- ifelse(table_data$table %in% with_update_col, TRUE, FALSE)
 
-  if (is.null(days_intervals) || days_intervals == 0) {
+  if (is.na(days_intervals) || days_intervals == 0) {
 
     return(api_url)
 
