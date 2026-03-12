@@ -1621,14 +1621,7 @@ process_spatial <- function(gdb_folder,
   }
   cli::cli_process_done()
 
-  cli::cli_process_start("Validating geometries")
 
-  #Make geometries valid
-  global.ctry.01 <- sf::st_make_valid(global.ctry.01)
-  global.prov.01 <- sf::st_make_valid(global.prov.01)
-  global.dist.01 <- sf::st_make_valid(global.dist.01)
-
-  cli::cli_process_done()
 
 
   # identify sf var in global.ctry
@@ -1693,6 +1686,13 @@ process_spatial <- function(gdb_folder,
   }
 
   rm(invalid.ctry.shapes, check.ctry.valid, row.num.ctry, empty.ctry)
+
+  cli::cli_process_start("Validating country geometries")
+
+  #Make geometries valid
+  global.ctry.01 <- sf::st_make_valid(global.ctry.01)
+
+  cli::cli_process_done()
 
   # identify potential duplicates
   cli::cli_process_start("Checking country shapes for duplicates")
@@ -1850,6 +1850,11 @@ process_spatial <- function(gdb_folder,
 
   rm(check.prov.valid, row.num.prov, invalid.prov.shapes, empty.prov)
 
+  cli::cli_process_start("Validating province geometries")
+  global.prov.01 <- sf::st_make_valid(global.prov.01)
+
+  cli::cli_process_done()
+
   # duplicate checking in provinces
   cli::cli_process_start("Checking province shapes for duplicates")
   dupe.guid.prov <- global.prov.01 |>
@@ -1995,6 +2000,11 @@ process_spatial <- function(gdb_folder,
   }
 
   rm(check.dist.valid, row.num.dist, invalid.dist.shapes, empty.dist)
+
+  cli::cli_process_start("Validating district geometries")
+  global.dist.01 <- sf::st_make_valid(global.dist.01)
+
+  cli::cli_process_done
 
   # evaluate district duplicates
   cli::cli_process_start("Checking district shapes for duplicates")
