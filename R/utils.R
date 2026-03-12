@@ -6221,7 +6221,7 @@ s2_export_afp_outputs <- function(data, latest_archive, polis_data_folder,
       msg_done = "Generated combined Other Surveillance dataset"
     )
 
-    # Find all other surveillance files in Core_Ready_Files and core_files_to_combine
+    # Find all other surveillance files in Core_Ready_Files
     other_files_main <- dplyr::tibble("name" = tidypolis_io(
       io = "list",
       file_path = paste0(polis_data_folder, "/", output_folder_name),
@@ -6230,24 +6230,40 @@ s2_export_afp_outputs <- function(data, latest_archive, polis_data_folder,
       dplyr::filter(grepl(paste0("^.*(other_surveillance).*(\\", output_format, ")$"), name)) |>
       dplyr::pull(name)
 
-    other_files_combine <- dplyr::tibble("name" = tidypolis_io(
-      io = "list",
-      file_path = paste0(polis_data_folder, "/core_files_to_combine"),
-      full_names = TRUE
-    )) |>
-      dplyr::filter(grepl("^.*(other_surveillance).*(.rds)$", name)) |>
-      dplyr::pull(name)
+    # Optional combine folder files (core_files_to_combine)
+    core_combine_path <- file.path(polis_data_folder, "core_files_to_combine")
+    other_files_combine <- character(0)
 
-    # Combine other surveillance files
-    if (length(other_files_combine) > 0) {
-      invisible(capture.output(
-        other_to_combine <- purrr::map_df(other_files_combine, ~ tidypolis_io(
-          io = "read",
-          file_path = .x
-        ))
-      ))
+    if (tidypolis_io(io = "exists.dir", file_path = core_combine_path)) {
+      other_files_combine <- dplyr::tibble(name = tidypolis_io(
+        io = "list",
+        file_path = core_combine_path,
+        full_names = TRUE
+      )) |>
+        dplyr::filter(grepl("^.*(other_surveillance).*(\\.rds)$", name)) |>
+        dplyr::pull(name)
+    }
 
-      other_to_combine <- other_to_combine |>
+    # Require at least one main file to produce output
+    if (length(other_files_main) == 0) {
+      cli::cli_alert_warning(
+        "No Other Surveillance files found in {file.path(polis_data_folder, output_folder_name)}; skipping combine/export."
+      )
+    } else {
+
+      # Read main files
+      other_new <- purrr::map_df(other_files_main, ~ tidypolis_io(io = "read", file_path = .x))
+
+      # Read optional combine files and bind if present
+      if (length(other_files_combine) > 0) {
+        other_to_combine <- purrr::map_df(other_files_combine, ~ tidypolis_io(io = "read", file_path = .x))
+        other_combined <- dplyr::bind_rows(other_new, other_to_combine)
+      } else {
+        other_combined <- other_new
+      }
+
+      # Standardize types / parse dates on final combined dataset
+      other_combined <- other_combined |>
         dplyr::mutate(
           stool1tostool2 = as.numeric(stool1tostool2),
           datenotificationtohq = lubridate::parse_date_time(
@@ -6256,47 +6272,30 @@ s2_export_afp_outputs <- function(data, latest_archive, polis_data_folder,
           )
         )
 
-      invisible(capture.output(
-        other_new <- purrr::map_df(
-          other_files_main,
-          ~ tidypolis_io(io = "read", file_path = .x)
-        )
-      ))
-
-      other_combined <- dplyr::bind_rows(other_new, other_to_combine)
-
       # Export combined other surveillance dataset
-      invisible(capture.output(
-        tidypolis_io(
-          obj = other_combined,
-          io = "write",
-          file_path = paste0(
-            polis_data_folder,
-            "/", output_folder_name,
-            "/other_surveillance_type_linelist_",
-            min(other_combined$yronset, na.rm = TRUE),
-            "_",
-            max(other_combined$yronset, na.rm = TRUE),
-            output_format
-          )
-        )
-      ))
+      if (any(!is.na(other_combined$yronset))) {
+        yr_min <- min(other_combined$yronset, na.rm = TRUE)
+        yr_max <- max(other_combined$yronset, na.rm = TRUE)
+      } else {
+        yr_min <- yr_max <- as.integer(format(Sys.Date(), "%Y"))
+        cli::cli_alert_warning("No non-NA yronset values found; using current year for output filename.")
+      }
 
-      cli::cli_process_done()
+      tidypolis_io(
+        obj = other_combined,
+        io = "write",
+        file_path = file.path(
+          polis_data_folder,
+          output_folder_name,
+          paste0("other_surveillance_type_linelist_", yr_min, "_", yr_max, output_format)
+        )
+      )
     }
 
-    update_polis_log(
-      .event = "AFP and Other Surveillance Linelists Finished",
-      .event_type = "PROCESS"
-    )
-
     cli::cli_process_done()
-
     gc(full = TRUE)
 
     invisible(NULL)
-  }
-}
 
 #' Compare AFP data with archived version
 #'
@@ -7139,24 +7138,27 @@ s3_sia_write_precluster_data <- function(sia.06, polis_data_folder,
 #' @keywords internal
 #'
 s3_sia_combine_historical_data <- function(sia.new, polis_data_folder) {
-  # combine SIA pre-2020 with the current rds
-  # read SIA and combine to make one SIA dataset
+  core_combine_path <- file.path(polis_data_folder, "core_files_to_combine")
 
-  sia.files.02 <- dplyr::tibble(
-    "name" = tidypolis_io(
-      io = "list",
-      file_path = paste0(polis_data_folder, "/core_files_to_combine"),
-      full_names = TRUE
-    )
+  # If folder doesn't exist, treat historical as optional and return current data
+  if (!tidypolis_io(io = "exists.dir", file_path = core_combine_path)) {
+    return(sia.new)
+  }
+
+  # Find historical SIA rds files
+  sia_files_hist <- dplyr::tibble(
+    name = tidypolis_io(io = "list", file_path = core_combine_path, full_names = TRUE)
   ) |>
-    dplyr::filter(grepl("^.*(sia).*(.rds)$", name)) |>
+    dplyr::filter(grepl("^.*(sia).*(\\.rds)$", name)) |>
     dplyr::pull(name)
 
-  invisible(capture.output(
-    sia.to.combine <- purrr::map_df(sia.files.02, ~ tidypolis_io(io = "read", file_path = .x))
-  ))
+  # If none found, return current data
+  if (length(sia_files_hist) == 0) {
+    return(sia.new)
+  }
 
-  sia.to.combine <- sia.to.combine |>
+  # Read and combine
+  sia_hist <- purrr::map_df(sia_files_hist, ~ tidypolis_io(io = "read", file_path = .x)) |>
     dplyr::mutate(
       sub.activity.initial.planned.date = lubridate::parse_date_time(
         sub.activity.initial.planned.date,
@@ -7174,14 +7176,14 @@ s3_sia_combine_historical_data <- function(sia.new, polis_data_folder) {
       )
     )
 
-  sia.clean.01 <- dplyr::bind_rows(sia.new, sia.to.combine) |>
-    mutate(
+  sia_clean <- dplyr::bind_rows(sia.new, sia_hist) |>
+    dplyr::mutate(
       sub.activity.last.updated.date = lubridate::as_date(sub.activity.last.updated.date),
       last.updated.date = lubridate::as_date(last.updated.date)
     ) |>
-    dplyr::select(sia.code, sia.sub.activity.code, everything())
+    dplyr::select(sia.code, sia.sub.activity.code, dplyr::everything())
 
-  return(sia.clean.01)
+  sia_clean
 }
 
 #' Manager function for running cluster_dates() function
