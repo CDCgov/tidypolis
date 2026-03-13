@@ -234,8 +234,17 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     # Get full size of the table and the table IDs
     full_table_size <- get_table_size(table_data$table)
 
-    # Compare numbers of ids and full table size
+    # Compare numbers of downloaded ids and
+    # full table size to ensure all ids downloaded
     diff <- length(ids) - full_table_size
+
+    if (diff != 0) {
+      cli::cli_alert_warning(paste0("Table size and downloaded ids are not of the same length.",
+                                    " You may need to re-run the download for this table."))
+    } else {
+      cli::cli_alert_success("Number of downloaded IDs equals the number of expected table records.")
+    }
+
 
     # Load in cache
     cli::cli_process_start("Loading existing cache")
