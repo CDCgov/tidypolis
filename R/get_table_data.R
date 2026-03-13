@@ -244,7 +244,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     # Deduplicate after collation
 
-    # Compute latest date per id (lazy until collect)
+    # Compute latest date per id
     latest_dates <- current_cache |>
       dplyr::collect() |>
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
@@ -261,37 +261,6 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       dplyr::inner_join(latest_dates)
 
     cli::cli_process_done()
-
-    current_cache_n <- current_cache |>
-      dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
-      dplyr::collect() |>
-      nrow()
-
-    deleted_ids <- setdiff(current_cache |>
-                             dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
-                             collect() |>
-                             dplyr::pull(!!dplyr::sym(table_data$polis_id)), ids) # ids contain all the ids available
-
-    cli::cli_h3(paste0("'", table_data$table, "'", " table data"))
-    cli::cli_bullets(c(
-      "*" = paste0(table_size, " new rows of data downloaded"),
-      "*" = paste0(current_cache_n, " rows of data in the table"),
-      "*" = paste0(length(deleted_ids), " rows of data were deleted")
-    ))
-
-    update_polis_log(
-      .event = paste0(
-        table_data$table,
-        " - update - ",
-        out_n,
-        " new rows of data downloaded; ",
-        current_cache_n,
-        " rows of data available in old cache; ",
-        paste0(length(deleted_ids), " rows of data were deleted - "),
-        paste0(deleted_ids, collapse = ", ")
-      ),
-      .event_type = "INFO"
-    )
 
     # Check for missed IDs
     updated_cache <- fetch_missing_records(table_data, ids, FALSE, current_cache)
@@ -323,6 +292,37 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
         table_data$table,
         ".parquet"
       )
+    )
+
+    updated_cache_n <- updated_cache |>
+      dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
+      dplyr::collect() |>
+      nrow()
+
+    deleted_ids <- setdiff(updated_cache |>
+                             dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
+                             collect() |>
+                             dplyr::pull(!!dplyr::sym(table_data$polis_id)), ids) # ids contain all the ids available
+
+    cli::cli_h3(paste0("'", table_data$table, "'", " table data"))
+    cli::cli_bullets(c(
+      "*" = paste0(table_size, " new rows of data downloaded"),
+      "*" = paste0(updated_cache_n, " rows of data in the table"),
+      "*" = paste0(length(deleted_ids), " rows of data were deleted")
+    ))
+
+    update_polis_log(
+      .event = paste0(
+        table_data$table,
+        " - update - ",
+        out_n,
+        " new rows of data downloaded; ",
+        updated_cache_n,
+        " rows of data available in old cache; ",
+        paste0(length(deleted_ids), " rows of data were deleted - "),
+        paste0(deleted_ids, collapse = ", ")
+      ),
+      .event_type = "INFO"
     )
 
     update_polis_log(
