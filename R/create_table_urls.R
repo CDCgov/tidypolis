@@ -101,7 +101,7 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = NULL) {
 create_table_urls <- function(api_url, table_data, days_intervals = 7) {
 
   with_update_col <- c("virus", "case", "human_specimen", "environmental_sample",
-                       "activity", "sub_activity", "population")
+                       "activity", "sub_activity")
   with_update_date <- ifelse(table_data$table %in% with_update_col, TRUE, FALSE)
 
   if (is.na(days_intervals) || days_intervals == 0) {
