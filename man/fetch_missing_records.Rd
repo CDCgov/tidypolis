@@ -8,7 +8,7 @@ fetch_missing_records(
   table_data,
   ids = NULL,
   parallel_calls = FALSE,
-  old_cache = NULL,
+  current_cache = NULL,
   chunk_size = 20
 )
 }
@@ -19,7 +19,7 @@ fetch_missing_records(
 
 \item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
 
-\item{old_cache}{\code{tibble} Data associated with the table, should already by de-duplicated.}
+\item{current_cache}{\code{tibble} Data associated with the table, should already by de-duplicated.}
 
 \item{chunk_size}{\code{int} Max number of records to call per call. Using too big of a chunk
 can cause issues with the API as the API call has a character length. Recommend not to

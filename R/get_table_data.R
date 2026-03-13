@@ -645,7 +645,7 @@ force_compile_raw_extract <- function(table_data) {
 #' @param chunk_size `int` Max number of records to call per call. Using too big of a chunk
 #' can cause issues with the API as the API call has a character length. Recommend not to
 #' change.
-#' @param old_cache `tibble` Data associated with the table, should already by de-duplicated.
+#' @param current_cache `tibble` Data associated with the table, should already by de-duplicated.
 #' @inheritParams update_polis_table
 #'
 #' @returns `parquet connection` Data associated with the table including missing records.
@@ -654,7 +654,7 @@ force_compile_raw_extract <- function(table_data) {
 fetch_missing_records <- function(table_data,
                                   ids = NULL,
                                   parallel_calls = FALSE,
-                                  old_cache = NULL,
+                                  current_cache = NULL,
                                   chunk_size = 20) {
 
   base_url <- "https://extranet.who.int/polis/api/v2/"
@@ -669,13 +669,13 @@ fetch_missing_records <- function(table_data,
   }
 
   # Load in cache
-  if (is.null(old_cache)) {
+  if (is.null(current_cache)) {
     cli::cli_process_start("Loading existing cache")
 
-    old_cache <- collate_file_extracts(table_data)
+    current_cache <- collate_file_extracts(table_data)
 
     # Deduplicate after collation
-    latest_dates <- old_cache |>
+    latest_dates <- current_cache |>
       dplyr::collect() |>
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
       summarize(updated_date = max(!!dplyr::sym(table_data$polis_update_id), na.rm = TRUE)) |>
@@ -687,7 +687,7 @@ fetch_missing_records <- function(table_data,
                          updated_date = table_data$polis_update_id)
 
     # Join back to get full rows that match the latest date
-    old_cache <- old_cache |>
+    current_cache <- current_cache |>
       dplyr::collect() |>
       dplyr::inner_join(latest_dates)
 
@@ -700,7 +700,7 @@ fetch_missing_records <- function(table_data,
   cli::cli_process_start("Checking for missed records in download")
   ids_table <- dplyr::tibble(ids)
   missed.id <- ids_table |>
-    dplyr::filter(!ids %in% dplyr::pull(old_cache[table_data$polis_id])) |>
+    dplyr::filter(!ids %in% dplyr::pull(current_cache[table_data$polis_id])) |>
     dplyr::distinct(ids)
   cli::cli_process_done()
 
@@ -765,7 +765,7 @@ fetch_missing_records <- function(table_data,
 
   } else {
 
-    return(old_cache) # deduped and already a tibble
+    return(current_cache) # deduped and already a tibble
 
   }
 
