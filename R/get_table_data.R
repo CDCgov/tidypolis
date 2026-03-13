@@ -675,16 +675,14 @@ fetch_missing_records <- function(table_data,
     old_cache <- collate_file_extracts(table_data)
 
     # Deduplicate after collation
-
-    # Compute latest date per id (lazy until collect)
     latest_dates <- old_cache |>
+      dplyr::collect() |>
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
       summarize(updated_date = max(!!dplyr::sym(table_data$polis_update_id), na.rm = TRUE)) |>
       dplyr::ungroup()
 
     # Rename the updated date column
     latest_dates <- latest_dates |>
-      dplyr::collect() |>
       dplyr::rename_with(recode,
                          updated_date = table_data$polis_update_id)
 
