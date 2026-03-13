@@ -52,7 +52,7 @@ init_tidypolis <- function(
     cli::cli_alert_success("POLIS data folder found!")
   } else {
     val <- request_input(
-      request = paste0("Confirm creation of POLIS data folder at '", polis_folder),
+      request = paste0("Confirm creation of POLIS data folder at '", polis_folder, "'"),
       vals = c("Y", "N")
     )
 
