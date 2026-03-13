@@ -318,7 +318,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
         out_n,
         " new rows of data downloaded; ",
         updated_cache_n,
-        " rows of data available in old cache; ",
+        " rows of data available in the cache; ",
         paste0(length(deleted_ids), " rows of data were deleted - "),
         paste0(deleted_ids, collapse = ", ")
       ),
