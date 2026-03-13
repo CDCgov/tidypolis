@@ -581,9 +581,9 @@ force_compile_raw_extract <- function(table_data) {
   } else {
 
     # Perform deduplication
-    old_cache <- collate_file_extracts(table_data)
+    current_cache <- collate_file_extracts(table_data)
     # Compute latest date per id (lazy until collect)
-    latest_dates <- old_cache |>
+    latest_dates <- current_cache |>
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
       summarize(updated_date = max(!!dplyr::sym(table_data$polis_update_id), na.rm = TRUE)) |>
       dplyr::ungroup()
@@ -595,7 +595,7 @@ force_compile_raw_extract <- function(table_data) {
                          updated_date = table_data$polis_update_id)
 
     # Join back to get full rows that match the latest date
-    old_cache <- old_cache |>
+    current_cache <- current_cache |>
       dplyr::inner_join(latest_dates)
 
     # Find deleted records
@@ -603,12 +603,12 @@ force_compile_raw_extract <- function(table_data) {
     ids <- get_table_ids(table_data, parallel_calls = FALSE)
     cli::cli_process_done()
 
-    deleted_ids <- setdiff(old_cache |>
+    deleted_ids <- setdiff(current_cache |>
                              dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
                              collect() |>
                              dplyr::pull(!!dplyr::sym(table_data$polis_id)), ids)
 
-    old_cache <- old_cache |>
+    current_cache <- current_cache |>
       dplyr::collect() |>
       dplyr::mutate(dplyr::across(dplyr::any_of(table_data$polis_id),
                                   \(x) as.character(x))) |>
@@ -617,7 +617,7 @@ force_compile_raw_extract <- function(table_data) {
 
     cli::cli_process_start("Writing data cache")
     tidypolis_io(
-      obj = old_cache, io = "write",
+      obj = current_cache, io = "write",
       file_path = paste0(
         Sys.getenv("POLIS_DATA_CACHE"),
         "/",
@@ -631,7 +631,7 @@ force_compile_raw_extract <- function(table_data) {
 
   }
 
-  invisible(old_cache)
+  invisible(current_cache)
 
 }
 
