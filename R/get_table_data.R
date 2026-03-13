@@ -198,7 +198,6 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     if (table_size == 0) {
       cli::cli_alert_success("No new records. Skipping download.")
-      out <- NULL
       out_n <- 0
 
     } else {
