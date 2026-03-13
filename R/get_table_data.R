@@ -212,7 +212,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       update_polis_log(
         .event = paste0(
           "Downloaded ",
-          nrow(out),
+          out_n,
           " rows of ",
           table_data$table,
           " data"
