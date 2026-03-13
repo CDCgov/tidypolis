@@ -37,6 +37,10 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
         )
       table_data$polis_update_value[1] <- NA # force to download from 2000
       urls <- create_table_urls(api_url, table_data, 730)
+
+      # create_table_urls() appends "?$filter=" but our api_url
+      # already has a param so we must convert "?$filter" to "&$filter" to
+      # form a valid URL
       urls <- stringr::str_replace_all(urls, stringr::fixed("?$filter"), stringr::fixed("&$filter"))
       response <- call_urls(urls)
     }
