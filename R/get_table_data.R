@@ -240,12 +240,12 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     # Load in cache
     cli::cli_process_start("Loading existing cache")
 
-    old_cache <- collate_file_extracts(table_data)
+    current_cache <- collate_file_extracts(table_data)
 
     # Deduplicate after collation
 
     # Compute latest date per id (lazy until collect)
-    latest_dates <- old_cache |>
+    latest_dates <- current_cache |>
       dplyr::collect() |>
       dplyr::group_by(!!dplyr::sym(table_data$polis_id)) |>
       summarize(updated_date = max(!!dplyr::sym(table_data$polis_update_id), na.rm = TRUE)) |>
@@ -257,17 +257,17 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
                     updated_date = table_data$polis_update_id)
 
     # Join back to get full rows that match the latest date
-    old_cache <- old_cache |>
+    current_cache <- current_cache |>
       dplyr::inner_join(latest_dates)
 
     cli::cli_process_done()
 
-    old_cache_n <- old_cache |>
+    current_cache_n <- current_cache |>
       dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
       dplyr::collect() |>
       nrow()
 
-    deleted_ids <- setdiff(old_cache |>
+    deleted_ids <- setdiff(current_cache |>
                              dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
                              collect() |>
                              dplyr::pull(!!dplyr::sym(table_data$polis_id)), ids) # ids contain all the ids available
@@ -275,7 +275,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     cli::cli_h3(paste0("'", table_data$table, "'", " table data"))
     cli::cli_bullets(c(
       "*" = paste0(table_size, " new rows of data downloaded"),
-      "*" = paste0(old_cache_n, " rows of data in the table"),
+      "*" = paste0(current_cache_n, " rows of data in the table"),
       "*" = paste0(length(deleted_ids), " rows of data were deleted")
     ))
 
@@ -285,7 +285,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
         " - update - ",
         out_n,
         " new rows of data downloaded; ",
-        old_cache_n,
+        current_cache_n,
         " rows of data available in old cache; ",
         paste0(length(deleted_ids), " rows of data were deleted - "),
         paste0(deleted_ids, collapse = ", ")
@@ -294,7 +294,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     )
 
     # Check for missed IDs
-    updated_cache <- fetch_missing_records(table_data, ids, FALSE, old_cache)
+    updated_cache <- fetch_missing_records(table_data, ids, FALSE, current_cache)
 
     # Final de-dup step for the updated cache
     updated_cache <- updated_cache |>
