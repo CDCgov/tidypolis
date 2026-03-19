@@ -8409,72 +8409,121 @@ s5_pos_compare_with_archive <- function(afp.es.virus.01, afp.es.virus.03, polis_
   }
 
   # ------------------------------------------------------------
-  # Virus-level presence checks (archive vs most recent)
+  # EPID-level comparison (previous vs most recent)
   # ------------------------------------------------------------
 
-  # Define the "virus key" (adjust columns if your canonical virus identifier differs)
-  new_virus_set <- afp.es.virus.03 |>
-    dplyr::mutate(
-      virustype = stringr::str_squish(as.character(virustype)),
-      measurement = stringr::str_squish(as.character(measurement))
+  new <- afp.es.virus.03 |>
+    unique() |>
+    dplyr::mutate(epid = stringr::str_squish(epid)) |>
+    dplyr::group_by(epid) |>
+    dplyr::slice(1) |>
+    dplyr::ungroup() |>
+    dplyr::mutate_all(as.character)
+
+  old <- old.pos |>
+    dplyr::mutate(epid = stringr::str_squish(epid)) |>
+    dplyr::group_by(epid) |>
+    dplyr::slice(1) |>
+    dplyr::ungroup() |>
+    dplyr::mutate_all(as.character)
+
+
+  # -----------------------------
+  # Missing epids
+  # -----------------------------
+  in_old_not_new <- old |>
+    dplyr::filter(!(epid %in% new$epid)) |>
+    dplyr::select(
+      place.admin.0,
+      epid,
+      dateonset,
+      yronset,
+      source,
+      virustype
     ) |>
-    dplyr::distinct(virustype, measurement) |>
-    dplyr::filter(!is.na(virustype) | !is.na(measurement)) |>
-    dplyr::mutate(source = "most_recent")
+    dplyr::arrange(desc(dateonset))
 
-  old_virus_set <- old.pos |>
-    dplyr::mutate(
-      virustype = stringr::str_squish(as.character(virustype)),
-      measurement = stringr::str_squish(as.character(measurement))
-    ) |>
-    dplyr::distinct(virustype, measurement) |>
-    dplyr::filter(!is.na(virustype) | !is.na(measurement)) |>
-    dplyr::mutate(source = "archive")
-
-  # Virus types present in archive but not present now
-  virus_in_archive_not_in_recent <- old_virus_set |>
-    dplyr::select(-source) |>
-    dplyr::anti_join(new_virus_set |>
-                       dplyr::select(-source),
-                     by = c("virustype", "measurement"))
-
-  # Optional: include simple counts for context (how many records carry each virus key)
-  new_virus_counts <- afp.es.virus.03 |>
-    dplyr::mutate(
-      virustype = stringr::str_squish(as.character(virustype)),
-      measurement = stringr::str_squish(as.character(measurement))
-    ) |>
-    dplyr::count(virustype, measurement, name = "n_records_recent")
-
-  old_virus_counts <- old.pos |>
-    dplyr::mutate(
-      virustype = stringr::str_squish(as.character(virustype)),
-      measurement = stringr::str_squish(as.character(measurement))
-    ) |>
-    dplyr::count(virustype, measurement, name = "n_records_archive")
-
-  virus_in_archive_not_in_recent <- virus_in_archive_not_in_recent |>
-    dplyr::left_join(old_virus_counts, by = c("virustype", "measurement"))
-
-  # Log + export
-
-  if (nrow(virus_in_archive_not_in_recent) > 0) {
+  if (nrow(in_old_not_new) > 0) {
     update_polis_log(
       .event = paste0(
-        "Virus types present in ARCHIVE but not in MOST RECENT: ",
-        nrow(virus_in_archive_not_in_recent),
-        " (see virus_types_in_archive_not_in_recent.csv)"
+        "EPIDs present in archive but NOT in most recent data: ",
+        nrow(in_old_not_new),
+        ". Review in in_old_not_new_virusTableData.csv"
       ),
       .event_type = "ALERT"
     )
 
     tidypolis_io(
-      obj = virus_in_archive_not_in_recent,
+      obj = in_old_not_new,
       io = "write",
       file_path = file.path(
         polis_data_folder,
         output_folder_name,
-        "virus_types_in_archive_not_in_recent.csv"
+        "in_old_not_new_virusTableData.csv"
+      )
+    )
+
+    # Optional summary (helps reviewers a lot)
+    summary_old_not_new <- in_old_not_new |>
+      dplyr::count(place.admin.0, virustype, name = "n") |>
+      dplyr::arrange(desc(n))
+
+    tidypolis_io(
+      obj = summary_old_not_new,
+      io = "write",
+      file_path = file.path(
+        polis_data_folder,
+        output_folder_name,
+        "in_old_not_new_summary.csv"
+      )
+    )
+  }
+
+  # -----------------------------
+  # EPIDs in both but modified
+  # -----------------------------
+  in_new_and_old_but_modified <- new |>
+    dplyr::filter(epid %in% old$epid) |>
+    dplyr::select(-c(setdiff(colnames(new), colnames(old)))) |>
+    setdiff(old |>
+              dplyr::select(-c(setdiff(colnames(old), colnames(new))))) |>
+    dplyr::inner_join(old |>
+                        dplyr::filter(epid %in% new$epid) |>
+                        dplyr::select(-c(setdiff(colnames(old), colnames(new)))) |>
+                        dplyr::setdiff(new |>
+                                         dplyr::select(-c(setdiff(colnames(new), colnames(old))))),
+                      by = "epid"
+    ) |>
+    tidyr::pivot_longer(cols = -epid) |>
+    dplyr::mutate(source = ifelse(stringr::str_sub(name, -2) == ".x", "new", "old")) |>
+    dplyr::mutate(name = stringr::str_sub(name, 1, -3)) |>
+    tidyr::pivot_wider(names_from = source, values_from = value)
+
+  if (nrow(in_new_and_old_but_modified) > 0) {
+    in_new_and_old_but_modified <- in_new_and_old_but_modified |>
+      dplyr::mutate(new = as.character(new)) |>
+      dplyr::mutate(old = as.character(old)) |>
+      dplyr::filter(new != old & !name %in% c("latitude", "longitude"))
+
+    pos_changed_virustype <- in_new_and_old_but_modified |>
+      dplyr::filter(name == "measurement")
+
+    if (nrow(pos_changed_virustype) > 0) {
+      update_polis_log(
+        .event = paste0(
+          "Virus type has changed for ",
+          nrow(pos_changed_virustype),
+          " records, review in Changed_virustype_virusTableData.csv"
+        ),
+        .event_type = "ALERT"
+      )
+    }
+
+    tidypolis_io(
+      obj = pos_changed_virustype,
+      io = "write",
+      file_path = file.path(
+        "C:/Users/uhx0/Downloads/Changed_virustype_virusTableData.csv"
       )
     )
   }
