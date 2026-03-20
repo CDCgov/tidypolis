@@ -2843,8 +2843,6 @@ s1_clean_case_table <- function(path, crosswalk,
   cli::cli_process_done()
 
   cli::cli_process_start("Checking for Contact epids classified as AFP")
-  #Temporary location (Will update to edav location)
-  output_dir <- "C:/Users/uhx0/Downloads/afp_contacts_count.csv"  # change later
 
   afp_contacts_count<- api_case_sub3 |>
     dplyr::mutate(
@@ -2872,14 +2870,19 @@ s1_clean_case_table <- function(path, crosswalk,
     dplyr::arrange(`Place Admin 0`, Year, EPID)
 
   if (nrow(afp_contacts_count) > 0) {
-    output_file <- file.path(
-      output_dir,
-      paste0("afp_contacts_count", format(Sys.Date(), "%Y-%m-%d"), ".csv")
-    )
-    readr::write_csv(afp_contacts_count, output_file)
-    cli::cli_alert_warning(paste0(
-      "AFP check: Found ", nrow(afp_contacts_count),
-      " records. CSV saved to: ", output_file
+    invisible(capture.output(
+      tidypolis_io(
+        io = "write",
+        file_path = paste0(
+          polis_data_folder, "/", output_folder_name,
+          "/afp_contacts_count.csv"
+        ),
+        obj = afp_contacts_count |>
+          dplyr::select(
+            `Place Admin 0`, EPID, `Date of Onset`,
+            `Stool 1 Collection Date`, `Stool 2 Collection Date`
+          )
+      )
     ))
   } else {
     cli::cli_alert_success("AFP check: No matches found.")
