@@ -32,7 +32,16 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
 
   response <- httr2::req_perform_parallel(url_requests, on_error = "continue")
   out <- purrr::map(response, \(x) {
-    httr2::resp_body_json(x, simplifyVector = TRUE)
+    tryCatch(
+      {
+        httr2::resp_body_json(x, simplifyVector = TRUE)
+      },
+      error = \(e) {
+        cli::cli_alert_info("Bad request: ", x$message)
+        NULL
+      }
+    )
+    
   })
 
   # the actual data
@@ -70,7 +79,7 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
 #'    virus_data <- call_urls_in_parallel(urls)
 #' }
 call_urls_in_parallel <- function(urls, requests_per_minute = 30, polis_key = Sys.getenv("POLIS_API_KEY")) {
-
+  
   response <- call_urls_in_parallel_helper(urls, polis_key, requests_per_minute)
   api_data <- response$data
   next_link_urls <- response$next_links
