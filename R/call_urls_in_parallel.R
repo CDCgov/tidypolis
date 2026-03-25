@@ -14,12 +14,23 @@
 call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
 
   url_requests <- purrr::map(urls, \(x) {
-    httr2::request(x) |>
-      httr2::req_headers(`Authorization-Token` = polis_key) |>
-      httr2::req_throttle(capacity = requests_per_minute)
+    tryCatch(
+      {
+        httr2::request(x) |>
+          httr2::req_headers(`Authorization-Token` = polis_key) |>
+          httr2::req_throttle(capacity = requests_per_minute)
+      },
+      error = \(e) {
+        cli::cli_alert_info(paste0("Not a valid URL and will be ignored: ", x))
+        NA
+      }
+    )
   })
 
-  response <- httr2::req_perform_parallel(url_requests)
+  # Remove invalid URLs from the call
+  url_requests <- url_requests[!is.na(url_requests)]
+
+  response <- httr2::req_perform_parallel(url_requests, on_error = "continue")
   out <- purrr::map(response, \(x) {
     httr2::resp_body_json(x, simplifyVector = TRUE)
   })
