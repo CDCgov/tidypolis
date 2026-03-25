@@ -4,13 +4,29 @@
 \alias{fetch_missing_records}
 \title{Get extract with missed records}
 \usage{
-fetch_missing_records(table_data)
+fetch_missing_records(
+  table_data,
+  ids = NULL,
+  parallel_calls = FALSE,
+  current_cache = NULL,
+  chunk_size = 20
+)
 }
 \arguments{
 \item{table_data}{\code{tibble} One row tibble with the data for a specific table.}
+
+\item{ids}{\code{str} Full IDs of a table. When \code{NULL}, which obtains IDs by running \code{\link[=get_table_ids]{get_table_ids()}} internally.}
+
+\item{parallel_calls}{\code{logical} Whether to obtain data in parallel, or sequentially. Defaults to \code{TRUE}.}
+
+\item{current_cache}{\code{tibble} Data associated with the table, should already by de-duplicated.}
+
+\item{chunk_size}{\code{int} Max number of records to call per call. Using too big of a chunk
+can cause issues with the API as the API call has a character length. Recommend not to
+change.}
 }
 \value{
-\code{NULL} invisibly
+\verb{parquet connection} Data associated with the table including missing records.
 }
 \description{
 Attempts to download an extract of records missed by a previous run of
