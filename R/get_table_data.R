@@ -273,6 +273,11 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     # Check for missed IDs
     updated_cache <- fetch_missing_records(table_data, ids, FALSE, current_cache)
 
+    deleted_ids <- setdiff(updated_cache |>
+      dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
+      collect() |>
+      dplyr::pull(!!dplyr::sym(table_data$polis_id)), ids) # ids contain all the ids available
+  
     # Final de-dup step for the updated cache
     updated_cache <- updated_cache |>
       dplyr::collect() |>
@@ -306,11 +311,6 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
       dplyr::collect() |>
       nrow()
-
-    deleted_ids <- setdiff(updated_cache |>
-                             dplyr::select(!!dplyr::sym(table_data$polis_id)) |>
-                             collect() |>
-                             dplyr::pull(!!dplyr::sym(table_data$polis_id)), ids) # ids contain all the ids available
 
     cli::cli_h3(paste0("'", table_data$table, "'", " table data"))
     cli::cli_bullets(c(
