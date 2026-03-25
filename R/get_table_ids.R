@@ -25,7 +25,7 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
           "?$select=Id,",
           table_data$polis_id
         )
-      response <- call_single_url(api_url)
+      response <- call_urls_in_parallel(api_url)
     } else {
       api_url <-
         paste0(
@@ -45,7 +45,7 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
       # already has a param so we must convert "?$filter" to "&$filter" to
       # form a valid URL
       urls <- stringr::str_replace_all(urls, stringr::fixed("?$filter"), stringr::fixed("&$filter"))
-      response <- call_urls(urls)
+      response <- call_urls_in_parallel(urls)
     }
 
     if (nrow(response) != 0) {

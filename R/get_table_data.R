@@ -205,7 +205,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       urls <- create_table_urls(table_url, table_data, days_interval)
 
       cli::cli_process_start("Downloading data")
-      out <- call_urls(urls)
+      out <- call_urls_in_parallel(urls)
       out_n <- nrow(out)
 
       update_polis_log(
@@ -227,7 +227,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     # check ids and make list of ids to be deleted
     cli::cli_process_start("Getting table IDs to check for deleted IDs")
-    ids <- get_table_ids(table_data, parallel_calls = FALSE)
+    ids <- get_table_ids(table_data, parallel_calls = parallel_calls)
     cli::cli_process_done()
 
     # Get full size of the table and the table IDs
@@ -363,7 +363,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
   urls <- create_table_urls(table_url, table_data, days_interval)
 
   cli::cli_process_start("Downloading data")
-  out <- call_urls(urls)
+  out <- call_urls_in_parallel(urls)
 
   if (nrow(out) != table_size) {
     error_message <- paste0(
@@ -536,7 +536,7 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_KEY"),
                      table_data$polis_id)
 
   id_return <- tryCatch(
-    call_single_url(api_url, times = 1),
+    call_urls_in_parallel(api_url),
     error = function(cond) {
       return("Error")
     }
