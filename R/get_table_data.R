@@ -342,7 +342,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     cli::cli_process_done()
 
-  invisible()
+  invisible(updated_cache)
 
 }
 
@@ -470,7 +470,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
   cli::cli_process_done()
   gc()
 
-  invisible()
+  invisible(out)
 
 }
 
@@ -746,9 +746,11 @@ fetch_missing_records <- function(table_data,
       }
 
       request_missing_recs <- gsub(" ", "%20", request_missing_recs)
-      missing_epids_data <- call_single_url(request_missing_recs)
 
-    }, .progress = TRUE) |> dplyr::bind_rows()
+    }, .progress = TRUE)
+
+    missing_epids_data <- missing_epids_data |> unlist()
+    missing_epids_data <- call_urls_in_parallel(missing_epids_data)
 
     create_extract_file(table_data, missing_epids_data)
 
