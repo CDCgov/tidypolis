@@ -78,7 +78,7 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
 #'              "https://extranet.who.int/polis/api/v2/Virus?$filter=UpdatedDate%20gt%202026-01-27T11:56:54.220Z")
 #'    virus_data <- call_urls_in_parallel(urls)
 #' }
-call_urls_in_parallel <- function(urls, requests_per_minute = 30, polis_key = Sys.getenv("POLIS_API_KEY")) {
+call_urls_in_parallel <- function(urls, polis_key = Sys.getenv("POLIS_API_KEY"), requests_per_minute = 30) {
   
   response <- call_urls_in_parallel_helper(urls, polis_key, requests_per_minute)
   api_data <- response$data

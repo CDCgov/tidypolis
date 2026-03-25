@@ -6,16 +6,16 @@
 \usage{
 call_urls_in_parallel(
   urls,
-  requests_per_minute = 30,
-  polis_key = Sys.getenv("POLIS_API_KEY")
+  polis_key = Sys.getenv("POLIS_API_KEY"),
+  requests_per_minute = 30
 )
 }
 \arguments{
 \item{urls}{\code{str} A URL string or a vector of URL strings to call to the POLIS API.}
 
-\item{requests_per_minute}{\code{int} Maximum number of requests per minute. Defaults to 30.}
-
 \item{polis_key}{\code{str} POLIS API key.}
+
+\item{requests_per_minute}{\code{int} Maximum number of requests per minute. Defaults to 30.}
 }
 \value{
 \code{tibble} Data requested from the POLIS API.
