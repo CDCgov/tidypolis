@@ -101,10 +101,10 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = NULL) {
 create_table_urls <- function(api_url, table_data, days_intervals = 7) {
 
   with_update_col <- c("virus", "case", "human_specimen", "environmental_sample",
-                       "activity", "sub_activity", "population")
+                       "activity", "sub_activity")
   with_update_date <- ifelse(table_data$table %in% with_update_col, TRUE, FALSE)
 
-  if (is.null(days_intervals) || days_intervals == 0) {
+  if (is.na(days_intervals) || days_intervals == 0) {
 
     return(api_url)
 
@@ -121,7 +121,7 @@ create_table_urls <- function(api_url, table_data, days_intervals = 7) {
     }
 
     urls <- paste0(api_url, "?$filter=", date_intervals)
-    urls <- gsub(" ", "+", urls)
+    urls <- gsub(" ", "%20", urls)
     return(urls)
   } else {
     # IM and LQAS are the tables that need to be downloaded in full because they

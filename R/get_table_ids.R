@@ -17,23 +17,42 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
     # Variables: URL, Token, Filters, ...
     polis_api_root_url <- "https://extranet.who.int/polis/api/v2/"
 
-    api_url <-
-      paste0(
-        polis_api_root_url,
-        table_data$endpoint,
-        "?$select=Id,",
-        table_data$polis_id
-      )
-
     if (parallel_calls == FALSE) {
+      api_url <-
+        paste0(
+          polis_api_root_url,
+          table_data$endpoint,
+          "?$select=Id,",
+          table_data$polis_id
+        )
       response <- call_single_url(api_url)
     } else {
-      table_data$polis_update_value[1] <- NA # force to download from 2000
+      api_url <-
+        paste0(
+          polis_api_root_url,
+          table_data$endpoint,
+          "?$select=Id,",
+          table_data$polis_update_id, ",",
+          table_data$polis_id
+        )
+      table_data$polis_update_value[1] <- NA # force to download from year 2000
+      # 730 is about 2 years or 365 days
+      # it is entirely possible to use longer timeframes and
+      # that can be explored in a future issue
       urls <- create_table_urls(api_url, table_data, 730)
+
+      # create_table_urls() appends "?$filter=" but our api_url
+      # already has a param so we must convert "?$filter" to "&$filter" to
+      # form a valid URL
+      urls <- stringr::str_replace_all(urls, stringr::fixed("?$filter"), stringr::fixed("&$filter"))
       response <- call_urls(urls)
     }
 
-    ids <- response |> dplyr::pull(table_data$polis_id)
+    if (nrow(response) != 0) {
+      ids <- response |> dplyr::pull(table_data$polis_id)
+    } else {
+      ids <- NA
+    }
 
     cli::cli_process_done()
 
