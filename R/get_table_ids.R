@@ -32,11 +32,23 @@ get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), par
           table_data$polis_update_id, ",",
           table_data$polis_id
         )
-      table_data$polis_update_value[1] <- NA # force to download from year 2000
-      # 730 is about 2 years or 365 days
-      # it is entirely possible to use longer timeframes and
-      # that can be explored in a future issue
-      urls <- create_table_urls(api_url, table_data, 730)
+      
+      # Find the minimum update date from POLIS
+      min_date_url <- paste0(
+          polis_api_root_url,
+          table_data$endpoint,
+          "?$select=Id,",
+          table_data$polis_update_id,
+          "&$orderby=",
+          table_data$polis_update_id,
+          "%20asc&$top=1"
+        )
+      
+      min_date <- call_urls_in_parallel(min_date_url, api_key) |> 
+        pull(table_data$polis_update_id)
+      
+      table_data$polis_update_value[1] <- min_date # force to download from earliest updated date in the table
+      urls <- create_table_urls(api_url, table_data, 365)
 
       # create_table_urls() appends "?$filter=" but our api_url
       # already has a param so we must convert "?$filter" to "&$filter" to
