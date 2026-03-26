@@ -22,13 +22,18 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
       },
       error = \(e) {
         cli::cli_alert_info(paste0("Not a valid URL and will be ignored: ", x))
-        NA
+        NULL
       }
     )
   })
 
-  # Remove invalid URLs from the call
-  url_requests <- url_requests[!is.na(url_requests)]
+  # Remove invalid URLs from the call (which are NULLs)
+  url_requests <- purrr::compact(url_requests)
+
+  # If all URLs are invalid, return an empty list
+  if (length(url_requests) == 0) {
+    return(list(data = dplyr::tibble(), next_links = character()))
+  }
 
   response <- httr2::req_perform_parallel(url_requests, on_error = "continue")
   out <- purrr::map(response, \(x) {
@@ -40,7 +45,8 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
         cli::cli_alert_info(paste0("Bad request: ", x$url))
         NULL
       }
-    )
+    ) |>
+      purrr::compact()
     
   })
 

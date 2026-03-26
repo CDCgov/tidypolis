@@ -26,6 +26,7 @@
 #' @importFrom progressr handlers
 #' @importFrom progressr progressor
 #' @importFrom progressr with_progress
+#' @importFrom purrr compact
 #' @importFrom purrr map_df
 #' @importFrom purrr walk
 #' @importFrom readr col_character
