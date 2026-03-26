@@ -37,7 +37,7 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
         httr2::resp_body_json(x, simplifyVector = TRUE)
       },
       error = \(e) {
-        cli::cli_alert_info("Bad request: ", x$message)
+        cli::cli_alert_info("Bad request: ", x$url)
         NULL
       }
     )
