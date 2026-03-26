@@ -11,9 +11,6 @@
 get_table_ids <- function(table_data, api_key = Sys.getenv("POLIS_API_KEY"), parallel_calls = TRUE) {
     cli::cli_process_start(paste0("Downloading ", table_data$table, " table IDs"))
 
-    # disable SSL Mode
-    httr::set_config(httr::config(ssl_verifypeer = 0L))
-
     # Variables: URL, Token, Filters, ...
     polis_api_root_url <- "https://extranet.who.int/polis/api/v2/"
 
