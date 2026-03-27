@@ -1,4 +1,5 @@
 test_that("Testing the call_single_url() function", {
+  withr::local_options(lifecycle_verbosity = "quiet")
 
   local_mocked_bindings(
     RETRY = function(verb, url, config, times, quiet, terminate_on_success) {

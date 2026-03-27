@@ -1,6 +1,8 @@
 #' Call single URL
 #'
 #' @description
+#' `r lifecycle::badge("deprecated")`
+#' 
 #' Call a return the formatted output from one URL.
 #'
 #' @details
@@ -11,7 +13,8 @@
 #' @param times `int` Number of times to attempt connection with API.
 #' @param diagnostics `logical` Logging messages to see if calls are happening.
 #' @returns `tibble` Data from the response.
-#' @export
+#' @keywords internal
+#' 
 #' @examples
 #' \dontrun{
 #' call_single_url("https://extranet.who.int/polis/api/v2/Virus?$filter=VirusDate%20gt%202025-01-01")
@@ -21,6 +24,9 @@ call_single_url <- function(url,
                             api_key = Sys.getenv("POLIS_API_KEY"),
                             times = 10,
                             diagnostics = FALSE) {
+  
+  lifecycle::deprecate_warn("2.1.2", "call_single_url()", "call_urls_in_parallel()")
+  
   # disable SSL Mode
   httr::set_config(httr::config(ssl_verifypeer = 0L))
 
