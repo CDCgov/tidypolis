@@ -240,9 +240,12 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     # Force the download of the ids again to make sure they match with the full table size
     # Ensures that we don't inadvertently delete IDs that didn't come through because something
     # in get_table_ids() failed.
+    id_download_attempt <- 0
     while (diff != 0) {
       cli::cli_alert_warning(paste0("Table size and downloaded ids are not of the same length.",
-                                    " Redownloading table IDs again..."))
+      " Redownloading table IDs again..."))
+      id_download_attempt <- id_download_attempt + 1
+      cli::cli_alert_info(paste0("No. of attempts to download IDs again: ", id_download_attempt))
       
       # Check ids and make list of ids to be deleted
       cli::cli_process_start("Getting table IDs to check for deleted IDs")
