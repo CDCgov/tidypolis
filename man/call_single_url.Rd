@@ -24,6 +24,8 @@ call_single_url(
 \code{tibble} Data from the response.
 }
 \description{
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}}
+
 Call a return the formatted output from one URL.
 }
 \details{
@@ -35,3 +37,4 @@ call_single_url("https://extranet.who.int/polis/api/v2/Virus?$filter=VirusDate\%
 }
 
 }
+\keyword{internal}
