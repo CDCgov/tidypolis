@@ -34,7 +34,7 @@ test_that("Testing the call_urls() function", {
   # Test 0: Expect the deprecated function to still work
   expect_snapshot({
     x <- call_urls(urls)
-    expect_equal(x, 2)
+    expect_equal(nrow(x), 2)
   })
   
   # Test 1: Successfully returning response

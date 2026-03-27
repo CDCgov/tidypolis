@@ -15,6 +15,12 @@ test_that("Testing the call_single_url() function", {
 
   result <- call_single_url("https://test.example.com/data")
 
+  # Test 0: Expect the deprecated function still works
+  expect_snapshot({
+    x <- call_single_url("https://test.example.com/data")
+    expect_equal(nrow(x), 3)
+  })
+
   # Test 1: Successfully returning response
   expect_s3_class(result, "tbl_df")
   expect_equal(nrow(result), 3)
