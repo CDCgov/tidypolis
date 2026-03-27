@@ -99,13 +99,15 @@ call_urls_in_parallel <- function(
   requests_per_minute = 30,
   concurrent_requests = 10
 ) {
+  pages <- list()
+
   response <- call_urls_in_parallel_helper(
     urls,
     polis_key,
     requests_per_minute,
     concurrent_requests
   )
-  api_data <- response$data
+  pages[[length(pages) + 1]] <- response$data
   next_link_urls <- response$next_links
 
   while (length(next_link_urls) != 0) {
@@ -115,9 +117,10 @@ call_urls_in_parallel <- function(
       requests_per_minute,
       concurrent_requests
     )
-    api_data <- dplyr::bind_rows(api_data, response$data)
+    pages[[length(pages) + 1]] <- response$data
     next_link_urls <- response$next_links
   }
 
-  return(api_data)
+  return(dplyr::bind_rows(pages))
+  
 }
