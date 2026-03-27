@@ -1,4 +1,6 @@
 test_that("Testing the call_urls() function", {
+
+  withr::local_options(lifecycle_verbosity = "quiet")
   
   mockery::stub(
     call_urls,

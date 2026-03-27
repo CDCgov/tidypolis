@@ -1,10 +1,17 @@
 #' Call multiple URLs
 #'
-#' @description Call multiple URLs
+#' @description 
+#' `r lifecycle::badge("deprecated")`
+#' 
+#' Call multiple URLs
+#' 
 #' @param urls array of url strings
 #' @returns tibble with all data
-#' @export
+#' @keywords internal
 call_urls <- function(urls) {
+
+  lifecycle::deprecate_warn("2.1.2", "call_urls()", "call_urls_in_parallel()")
+
   doFuture::registerDoFuture() ## tell foreach to use future
 
   if (stringr::str_starts(Sys.getenv("SF_PARTNER"), "posit_workbench")) {
