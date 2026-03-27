@@ -3,7 +3,8 @@
 #' Helper function of call_urls_in_parallel
 #' 
 #' @description
-#' Does the actual requests to the POLIS API.
+#' Does the actual requests to the POLIS API. The default is set to 10 concurrent requests, 
+#' which is the default of the [httr2::req_perform_parallel] function.
 #' 
 #' @inheritParams call_urls_in_parallel
 #'
@@ -11,7 +12,7 @@
 #'
 #' @keywords internal
 #' 
-call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
+call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute, concurrent_requests) {
 
   url_requests <- purrr::map(urls, \(x) {
     tryCatch(
@@ -35,7 +36,10 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
     return(list(data = dplyr::tibble(), next_links = character()))
   }
 
-  response <- httr2::req_perform_parallel(url_requests, on_error = "continue")
+  response <- httr2::req_perform_parallel(url_requests, 
+    on_error = "continue", 
+    max_active = concurrent_requests)
+  
   out <- purrr::map(response, \(x) {
     tryCatch(
       {
@@ -45,10 +49,9 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
         cli::cli_alert_info(paste0("Bad request: ", x$url))
         NULL
       }
-    ) |>
-      purrr::compact()
-    
-  })
+    ) 
+  }) |>
+    purrr::compact()
 
   # the actual data
   value <- purrr::map(out, \(x) x$value) |> 
@@ -72,6 +75,7 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
 #' @param urls `str` A URL string or a vector of URL strings to call to the POLIS API.
 #' @param requests_per_minute `int` Maximum number of requests per minute. Defaults to 30.
 #' @param polis_key `str` POLIS API key.
+#' @param concurrent_requests `int` Number of concurrent requests. Defaults to 10.
 #'
 #' @returns `tibble` Data requested from the POLIS API. 
 #'
@@ -84,14 +88,14 @@ call_urls_in_parallel_helper <- function(urls, polis_key, requests_per_minute) {
 #'              "https://extranet.who.int/polis/api/v2/Virus?$filter=UpdatedDate%20gt%202026-01-27T11:56:54.220Z")
 #'    virus_data <- call_urls_in_parallel(urls)
 #' }
-call_urls_in_parallel <- function(urls, polis_key = Sys.getenv("POLIS_API_KEY"), requests_per_minute = 30) {
+call_urls_in_parallel <- function(urls, polis_key = Sys.getenv("POLIS_API_KEY"), requests_per_minute = 30, concurrent_requests = 10) {
   
-  response <- call_urls_in_parallel_helper(urls, polis_key, requests_per_minute)
+  response <- call_urls_in_parallel_helper(urls, polis_key, requests_per_minute, concurrent_requests)
   api_data <- response$data
   next_link_urls <- response$next_links
 
   while (length(next_link_urls) != 0) {
-    response <- call_urls_in_parallel_helper(next_link_urls, polis_key, requests_per_minute)
+    response <- call_urls_in_parallel_helper(next_link_urls, polis_key, requests_per_minute, concurrent_requests)
     api_data <- dplyr::bind_rows(api_data, response$data)
     next_link_urls <- response$next_links
   }

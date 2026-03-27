@@ -7,7 +7,8 @@
 call_urls_in_parallel(
   urls,
   polis_key = Sys.getenv("POLIS_API_KEY"),
-  requests_per_minute = 30
+  requests_per_minute = 30,
+  concurrent_requests = 10
 )
 }
 \arguments{
@@ -16,6 +17,8 @@ call_urls_in_parallel(
 \item{polis_key}{\code{str} POLIS API key.}
 
 \item{requests_per_minute}{\code{int} Maximum number of requests per minute. Defaults to 30.}
+
+\item{concurrent_requests}{\code{int} Number of concurrent requests. Defaults to 10.}
 }
 \value{
 \code{tibble} Data requested from the POLIS API.

@@ -4,7 +4,12 @@
 \alias{call_urls_in_parallel_helper}
 \title{Helper function of call_urls_in_parallel}
 \usage{
-call_urls_in_parallel_helper(urls, polis_key, requests_per_minute)
+call_urls_in_parallel_helper(
+  urls,
+  polis_key,
+  requests_per_minute,
+  concurrent_requests
+)
 }
 \arguments{
 \item{urls}{\code{str} A URL string or a vector of URL strings to call to the POLIS API.}
@@ -12,11 +17,14 @@ call_urls_in_parallel_helper(urls, polis_key, requests_per_minute)
 \item{polis_key}{\code{str} POLIS API key.}
 
 \item{requests_per_minute}{\code{int} Maximum number of requests per minute. Defaults to 30.}
+
+\item{concurrent_requests}{\code{int} Number of concurrent requests. Defaults to 10.}
 }
 \value{
 \code{list} A list containing a tibble of data and a vector of odata nextLink values.
 }
 \description{
-Does the actual requests to the POLIS API.
+Does the actual requests to the POLIS API. The default is set to 10 concurrent requests,
+which is the default of the \link[httr2:req_perform_parallel]{httr2::req_perform_parallel} function.
 }
 \keyword{internal}
