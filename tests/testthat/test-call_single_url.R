@@ -1,5 +1,38 @@
 # tests/testthat/test-call_single_url.R
 
+testthat::test_that("call_single_url() is deprecated", {
+  testthat::local_mocked_bindings(
+    RETRY = function(verb, url, config, times, quiet, terminate_on_success) {
+      # Use proper JSON types:
+      # - null (not "NULL")
+      # - numbers (not "36")
+      # - booleans (not "TRUE")
+      # Note: date_onset stays character unless call_single_url() explicitly parses Date.
+      mock_json <- '{
+        "value": [
+          {"epid":"PAK-2024-001","name":"Philip Santos","date_onset":null,"age_months":36,"vaccinated":true},
+          {"epid":"PAK-2024-002","name":"Phillip Khan","date_onset":"","age_months":24,"vaccinated":false},
+          {"epid":"PAK-2024-003","name":"Felipe Torres","date_onset":"2024-01-15","age_months":null,"vaccinated":true}
+        ]
+      }'
+
+      structure(
+        list(
+          status_code = 200L,
+          content = charToRaw(mock_json)
+        ),
+        class = "response"
+      )
+    },
+    .package = "httr"
+  )
+  
+  expect_snapshot({
+    result <- call_single_url("https://test.example.com/data")
+    expect_equal(nrow(result), 3)
+  })
+})
+
 testthat::test_that("call_single_url() returns a tibble for a 200 response", {
   withr::local_options(lifecycle_verbosity = "quiet")
 
