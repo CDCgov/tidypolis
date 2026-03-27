@@ -5,7 +5,7 @@
 #' tidycensus process for managing their API secrets.
 #'
 #' @param polis_folder `str` Location of folder where to store all information from POLIS.
-#' @param edav `logical` Should the system use EDAV as it's cache; default `FALSE`.
+#' @param edav `logical` Should the system use EDAV as it's cache; default `TRUE`.
 #' @param api_debug boolean: if true will log all api calls
 #' @returns Messages on process.
 #' @examples
@@ -21,8 +21,8 @@
 #' @export
 init_tidypolis <- function(
     polis_folder = "POLIS",
-    edav = F,
-    api_debug = F) {
+    edav = TRUE,
+    api_debug = FALSE) {
   if (api_debug) {
     Sys.setenv("API_DEBUG" = TRUE)
   } else {
@@ -52,7 +52,7 @@ init_tidypolis <- function(
     cli::cli_alert_success("POLIS data folder found!")
   } else {
     val <- request_input(
-      request = paste0("Confirm creation of POLIS data folder at '", polis_folder),
+      request = paste0("Confirm creation of POLIS data folder at '", polis_folder, "'"),
       vals = c("Y", "N")
     )
 
@@ -147,21 +147,21 @@ init_tidypolis <- function(
     cache_tibble <- dplyr::tibble(
       "table" = c(
         "cache", "virus", "case", "human_specimen", "environmental_sample",
-        "activity", "sub_activity", "lqas", "im", "population", "geography",
+        "activity", "sub_activity", "lqas", "im", "geography",
         "synonym", "indicator", "reference_data", "pop"
       ),
       "endpoint" = c(
         "cache", "Virus", "Case", "LabSpecimen", "EnvSample", "Activity",
-        "SubActivity", "Lqas", "Im", "Population", "Geography", "Synonym", "IndicatorValue",
+        "SubActivity", "Lqas", "Im", "Geography", "Synonym", "IndicatorValue",
         "RefData", "Population"
       ),
       "polis_id" = c(
         NA, "VirusId", "CaseManualEditId", "SpecimenId", "EnviroSampleManualEditId", "SubActivityId", "SubActivityByAdmin2Id",
-        "LqasId", "ImId", "FK_GeoplaceId", "PlaceId", NA, NA, NA, "Id"
+        "LqasId", "ImId", "PlaceId", NA, NA, NA, NA
       ),
       "polis_update_id" = c(
         NA, "UpdatedDate", "LastUpdateDate", "LastUpdateDate", "LastUpdateDate", "LastUpdateDate", "UpdatedDate",
-        NA, NA, "UpdatedDate", "UpdatedDate", NA, NA, NA, NA
+        NA, NA, "UpdatedDate", NA, NA, NA, NA
       ),
       "nrow" = NA
     ) |>

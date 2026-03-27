@@ -876,10 +876,10 @@
     },
     "cluster": {
       "Package": "cluster",
-      "Version": "2.1.8.1",
+      "Version": "2.1.8.2",
       "Source": "Repository",
-      "VersionNote": "Last CRAN: 2.1.8 on 2024-12-10; 2.1.7 on 2024-12-06; 2.1.6 on 2023-11-30; 2.1.5 on 2023-11-27",
-      "Date": "2025-03-11",
+      "VersionNote": "Last CRAN: 2.1.8.1 on 2025-03-11; 2.1.8 on 2024-12-10; 2.1.7 on 2024-12-06; 2.1.6 on 2023-11-30;",
+      "Date": "2026-02-03",
       "Priority": "recommended",
       "Title": "\"Finding Groups in Data\": Cluster Analysis Extended Rousseeuw et al.",
       "Description": "Methods for Cluster analysis.  Much extended the original from Peter Rousseeuw, Anja Struyf and Mia Hubert, based on Kaufman and Rousseeuw (1990) \"Finding Groups in Data\".",
@@ -913,7 +913,7 @@
       "License": "GPL (>= 2)",
       "URL": "https://svn.r-project.org/R-packages/trunk/cluster/",
       "NeedsCompilation": "yes",
-      "Author": "Martin Maechler [aut, cre] (<https://orcid.org/0000-0002-8685-9910>), Peter Rousseeuw [aut] (Fortran original, <https://orcid.org/0000-0002-3807-5353>), Anja Struyf [aut] (S original), Mia Hubert [aut] (S original, <https://orcid.org/0000-0001-6398-4850>), Kurt Hornik [trl, ctb] (port to R; maintenance(1999-2000), <https://orcid.org/0000-0003-4198-9911>), Matthias Studer [ctb], Pierre Roudier [ctb], Juan Gonzalez [ctb], Kamil Kozlowski [ctb], Erich Schubert [ctb] (fastpam options for pam(), <https://orcid.org/0000-0001-9143-4880>), Keefe Murphy [ctb] (volume.ellipsoid({d >= 3}))",
+      "Author": "Martin Maechler [aut, cre] (ORCID: <https://orcid.org/0000-0002-8685-9910>), Peter Rousseeuw [aut] (Fortran original, ORCID: <https://orcid.org/0000-0002-3807-5353>), Anja Struyf [aut] (S original), Mia Hubert [aut] (S original, ORCID: <https://orcid.org/0000-0001-6398-4850>), Kurt Hornik [trl, ctb] (port to R; maintenance(1999-2000), ORCID: <https://orcid.org/0000-0003-4198-9911>), Matthias Studer [ctb], Pierre Roudier [ctb], Juan Gonzalez [ctb], Kamil Kozlowski [ctb], Erich Schubert [ctb] (fastpam options for pam(), ORCID: <https://orcid.org/0000-0001-9143-4880>), Keefe Murphy [ctb] (volume.ellipsoid({d >= 3}))",
       "Repository": "CRAN"
     },
     "codetools": {
@@ -3507,7 +3507,7 @@
     },
     "sirfunctions": {
       "Package": "sirfunctions",
-      "Version": "2.1.2",
+      "Version": "2.1.5",
       "Source": "GitHub",
       "Title": "Key Functions to Analyze Global Polio Surveillance Data",
       "Authors@R": "c( person(\"Nishant\", \"Kishore\", , \"ynm2@cdc.gov\", role = c(\"aut\"), comment = c(ORCID = \"0000-0003-0408-2747\")), person(\"Mervin Keith\", \"Cuadera\", , \"xrg9@cdc.gov\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0003-4898-2659\")), person(\"Nicholas\", \"Heaghney\", , \"uic3@cdc.gov\", role = \"aut\"), person(\"Elizabeth\", \"Krow-Lucal\", , \"yxn9@cdc.gov\", role = \"aut\"), person(\"Smita\", \"Chavan\", , \"wsy2@cdc.gov\", role = \"aut\") )",
@@ -3574,14 +3574,19 @@
       "Encoding": "UTF-8",
       "Roxygen": "list(markdown = TRUE)",
       "RoxygenNote": "7.3.3",
-      "Author": "Nishant Kishore [aut] (ORCID: <https://orcid.org/0000-0003-0408-2747>), Mervin Keith Cuadera [aut, cre] (ORCID: <https://orcid.org/0000-0003-4898-2659>), Nicholas Heaghney [aut], Elizabeth Krow-Lucal [aut], Smita Chavan [aut]",
-      "Maintainer": "Mervin Keith Cuadera <xrg9@cdc.gov>",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
-      "RemoteUsername": "CDCGov",
       "RemoteRepo": "sirfunctions",
-      "RemoteRef": "main",
-      "RemoteSha": "5010c997b3ed7951d04de89f5e6120e1c7ddb402"
+      "RemoteUsername": "CDCGov",
+      "RemotePkgRef": "CDCGov/sirfunctions",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "bc081b94d34f0504ccca9ec1010761a6d310531e",
+      "NeedsCompilation": "no",
+      "Author": "Nishant Kishore [aut] (ORCID: <https://orcid.org/0000-0003-0408-2747>), Mervin Keith Cuadera [aut, cre] (ORCID: <https://orcid.org/0000-0003-4898-2659>), Nicholas Heaghney [aut], Elizabeth Krow-Lucal [aut], Smita Chavan [aut]",
+      "Maintainer": "Mervin Keith Cuadera <xrg9@cdc.gov>",
+      "Depends": [
+        "R (>= 4.1.0)"
+      ]
     },
     "skimr": {
       "Package": "skimr",
@@ -4422,7 +4427,7 @@
     },
     "xml2": {
       "Package": "xml2",
-      "Version": "1.5.1",
+      "Version": "1.5.2",
       "Source": "Repository",
       "Title": "Parse XML",
       "Authors@R": "c( person(\"Hadley\", \"Wickham\", role = \"aut\"), person(\"Jim\", \"Hester\", role = \"aut\"), person(\"Jeroen\", \"Ooms\", email = \"jeroenooms@gmail.com\", role = c(\"aut\", \"cre\")), person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\")), person(\"R Foundation\", role = \"ctb\", comment = \"Copy of R-project homepage cached as example\") )",
