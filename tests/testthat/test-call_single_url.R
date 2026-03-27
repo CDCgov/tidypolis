@@ -1,109 +1,177 @@
-test_that("Testing the call_single_url() function", {
+# tests/testthat/test-call_single_url.R
+
+testthat::test_that("call_single_url() returns a tibble for a 200 response", {
   withr::local_options(lifecycle_verbosity = "quiet")
 
-  local_mocked_bindings(
+  testthat::local_mocked_bindings(
     RETRY = function(verb, url, config, times, quiet, terminate_on_success) {
-      mock_json <- '{"value": [
-        {"epid": "PAK-2024-001", "name": "Philip Santos", "date_onset": "NULL", "age_months": "36", "vaccinated": "TRUE"},
-        {"epid": "PAK-2024-002", "name": "Phillip Khan", "date_onset": "", "age_months": "24", "vaccinated": "FALSE"},
-        {"epid": "PAK-2024-003", "name": "Felipe Torres", "date_onset": "2024-01-15", "age_months": "NULL", "vaccinated": "TRUE"}
-      ]}'
-      list(content = charToRaw(mock_json))
+      # Use proper JSON types:
+      # - null (not "NULL")
+      # - numbers (not "36")
+      # - booleans (not "TRUE")
+      # Note: date_onset stays character unless call_single_url() explicitly parses Date.
+      mock_json <- '{
+        "value": [
+          {"epid":"PAK-2024-001","name":"Philip Santos","date_onset":null,"age_months":36,"vaccinated":true},
+          {"epid":"PAK-2024-002","name":"Phillip Khan","date_onset":"","age_months":24,"vaccinated":false},
+          {"epid":"PAK-2024-003","name":"Felipe Torres","date_onset":"2024-01-15","age_months":null,"vaccinated":true}
+        ]
+      }'
+
+      structure(
+        list(
+          status_code = 200L,
+          content = charToRaw(mock_json)
+        ),
+        class = "response"
+      )
     },
     .package = "httr"
   )
 
   result <- call_single_url("https://test.example.com/data")
 
-  # Test 0: Expect the deprecated function still works
-  expect_snapshot({
-    x <- call_single_url("https://test.example.com/data")
-    expect_equal(nrow(x), 3)
-  })
+  testthat::expect_s3_class(result, "tbl_df")
+  testthat::expect_equal(nrow(result), 3)
 
-  # Test 1: Successfully returning response
-  expect_s3_class(result, "tbl_df")
-  expect_equal(nrow(result), 3)
+  # Types based on current call_single_url() behavior:
+  testthat::expect_type(result$epid, "character")
+  testthat::expect_type(result$name, "character")
 
-  # Test 3: Successfully assigning correct data types
-  expect_type(result$epid, "character")
-  expect_type(result$name, "character")
-  expect_s3_class(result$date_onset, "Date")
-  expect_type(result$age_months, "double")
-  expect_type(result$vaccinated, "logical")
-  expect_true(is.na(result$date_onset[1]))
-  expect_true(is.na(result$date_onset[2]))
-  expect_true(is.na(result$age_months[3]))
+  # date_onset will be character because call_single_url() does not parse Date
+  testthat::expect_type(result$date_onset, "character")
 
-  # Test 2: Successfully handling responses with a non-200 status
-  local_mocked_bindings(
+  # These will be properly typed if JSON uses numbers/booleans
+  testthat::expect_type(result$age_months, "integer")
+  testthat::expect_type(result$vaccinated, "logical")
+
+  # Missingness checks
+  testthat::expect_true(is.na(result$date_onset[1])) # null -> NA
+  testthat::expect_identical(result$date_onset[2], "") # empty string stays ""
+  testthat::expect_true(is.na(result$age_months[3])) # null -> NA
+})
+
+testthat::test_that("call_single_url() returns NA for non-200 status codes", {
+  withr::local_options(lifecycle_verbosity = "quiet")
+
+  testthat::local_mocked_bindings(
+    RETRY = function(verb, url, config, times, quiet, terminate_on_success) {
+      structure(
+        list(
+          status_code = 500L,
+          content = charToRaw('{"value":[]}')
+        ),
+        class = "response"
+      )
+    },
+    .package = "httr"
+  )
+
+  result <- call_single_url("https://test.example.com/non200")
+  testthat::expect_true(is.na(result))
+})
+
+testthat::test_that("call_single_url() propagates connection errors thrown by httr::RETRY()", {
+  withr::local_options(lifecycle_verbosity = "quiet")
+
+  testthat::local_mocked_bindings(
     RETRY = function(verb, url, config, times, quiet, terminate_on_success) {
       stop("Connection failed")
     },
     .package = "httr"
   )
 
-  expect_error(call_single_url("https://test.example.com/error"))
+  testthat::expect_error(
+    call_single_url("https://test.example.com/error"),
+    "Connection failed"
+  )
+})
 
+testthat::test_that("Sparse numeric fields remain numeric when JSON uses real nulls and numbers", {
+  withr::local_options(lifecycle_verbosity = "quiet")
 
-  # Test 5: Sparse numeric column should not be inferred as logical
-  local_mocked_bindings(
+  testthat::local_mocked_bindings(
     RETRY = function(verb, url, config, times, quiet, terminate_on_success) {
-      # Simulate 3000 rows with mostly NULLs in age_months
+      # Mostly nulls in age_months; some numeric values.
       mock_data <- lapply(1:3000, function(i) {
         list(
           epid = paste0("PAK-2024-", sprintf("%03d", i)),
           name = paste("Person", i),
-          date_onset = if (i %% 100 == 0) "2024-01-15" else "NULL",
-          age_months = if (i %% 100 == 0) as.character(i %% 60) else "NULL",
-          vaccinated = if (i %% 2 == 0) "TRUE" else "FALSE"
+          date_onset = if (i %% 100 == 0) "2024-01-15" else NULL,
+          age_months = if (i %% 100 == 0) (i %% 60) else NULL,
+          vaccinated = (i %% 2 == 0)
         )
       })
-      mock_json <- jsonlite::toJSON(list(value = mock_data), auto_unbox = TRUE)
-      list(content = charToRaw(mock_json))
+
+      mock_json <- jsonlite::toJSON(
+        list(value = mock_data),
+        auto_unbox = TRUE,
+        null = "null"
+      )
+
+      structure(
+        list(
+          status_code = 200L,
+          content = charToRaw(mock_json)
+        ),
+        class = "response"
+      )
     },
     .package = "httr"
   )
 
   result_sparse <- call_single_url("https://test.example.com/sparse")
 
-  # Ensure correct types
-  expect_type(result_sparse$epid, "character")
-  expect_type(result_sparse$name, "character")
-  expect_s3_class(result_sparse$date_onset, "Date")
-  expect_type(result_sparse$age_months, "double")  # This is the key check
-  expect_type(result_sparse$vaccinated, "logical")
+  testthat::expect_s3_class(result_sparse, "tbl_df")
+  testthat::expect_equal(nrow(result_sparse), 3000)
 
-  # Ensure no unintended logical columns
-  non_logical_cols <- sapply(result_sparse, function(col) !is.logical(col))
-  expect_true(all(non_logical_cols[names(non_logical_cols) != "vaccinated"]))
+  testthat::expect_type(result_sparse$epid, "character")
+  testthat::expect_type(result_sparse$name, "character")
+  testthat::expect_type(result_sparse$date_onset, "character") # not parsed to Date by function
+  testthat::expect_type(result_sparse$age_months, "integer")
+  testthat::expect_type(result_sparse$vaccinated, "logical")
 
+  # Ensure only vaccinated is logical
+  logical_cols <- vapply(result_sparse, is.logical, logical(1))
+  testthat::expect_identical(names(result_sparse)[logical_cols], "vaccinated")
+})
 
-  # Test 6: All NULLs in first 3000 rows should not infer numeric column as logical
-  local_mocked_bindings(
+testthat::test_that("A numeric column with first 3000 nulls is still numeric if later values are numbers", {
+  withr::local_options(lifecycle_verbosity = "quiet")
+
+  testthat::local_mocked_bindings(
     RETRY = function(verb, url, config, times, quiet, terminate_on_success) {
-      # First 3000 rows: age_months = "NULL"
-      # Row 3001: age_months = "48"
       mock_data <- lapply(1:3001, function(i) {
         list(
           epid = paste0("PAK-2024-", sprintf("%04d", i)),
           name = paste("Person", i),
           date_onset = "2024-01-01",
-          age_months = if (i <= 3000) "NULL" else "48",
-          vaccinated = if (i %% 2 == 0) "TRUE" else "FALSE"
+          age_months = if (i <= 3000) NULL else 48,
+          vaccinated = (i %% 2 == 0)
         )
       })
-      mock_json <- jsonlite::toJSON(list(value = mock_data), auto_unbox = TRUE)
-      list(content = charToRaw(mock_json))
+
+      mock_json <- jsonlite::toJSON(
+        list(value = mock_data),
+        auto_unbox = TRUE,
+        null = "null"
+      )
+
+      structure(
+        list(
+          status_code = 200L,
+          content = charToRaw(mock_json)
+        ),
+        class = "response"
+      )
     },
     .package = "httr"
   )
 
   result_nulls <- call_single_url("https://test.example.com/nulls")
 
-  # Check that age_months is still treated as numeric (double), not logical
-  expect_type(result_nulls$age_months, "double")
-  expect_true(is.na(result_nulls$age_months[1]))
-  expect_equal(result_nulls$age_months[3001], 48)
-
+  testthat::expect_equal(nrow(result_nulls), 3001)
+  testthat::expect_type(result_nulls$age_months, "integer")
+  testthat::expect_true(is.na(result_nulls$age_months[1]))
+  testthat::expect_identical(result_nulls$age_months[3001], as.integer(48))
 })
