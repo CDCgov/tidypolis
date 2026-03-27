@@ -30,6 +30,12 @@ test_that("Testing the call_urls() function", {
   
   urls <- c("https://api.test.com/data?skip=0", "https://api.test.com/data?skip=100")
   result <- call_urls(urls)
+
+  # Test 0: Expect the deprecated function to still work
+  expect_snapshot({
+    x <- call_urls(urls)
+    expect_equal(x, 2)
+  })
   
   # Test 1: Successfully returning response
   expect_s3_class(result, "tbl_df")
