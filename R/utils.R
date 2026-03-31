@@ -2856,7 +2856,8 @@ s1_clean_case_table <- function(path, crosswalk,
         EPID,
         stringr::regex("(HC\\d+|CC\\d+|C\\d+)$", ignore_case = TRUE)
       ),
-      is.na(.data[["Stool 2 Collection Date"]]) | Stool2_chr == ""
+      is.na(.data[["Stool 2 Collection Date"]]) | Stool2_chr == "",
+      !is.na(.data[["Paralysis Onset Date"]])
     ) |>
     dplyr::select(
       `Place Admin 0`,
