@@ -154,16 +154,29 @@ impute_missing_lab_geo <- function(lab_data, afp_data = NULL) {
 #' @param lab_locs_path `str` Path to lab locations CSV.
 #' @returns `tibble`
 #' @keywords internal
-get_lab_locs <- function(lab_locs_path) {
-  if (is.null(lab_locs_path)) {
-    cli::cli_abort("Please provide `lab_locs_path` when using cleaners.")
+get_lab_locs <- function(lab_locs_path = NULL, use_edav = TRUE) {
+  lab_locs <- if (is.null(lab_locs_path) && use_edav) {
+    tryCatch(
+      sirfunctions::edav_io("read", file_loc = "Data/lab/Routine_lab_testing_locations.csv"),
+      error = \(e) {
+        cli::cli_abort(c(
+          "Unable to read lab locations from EDAV default path.",
+          "i" = "Set `lab_locs_path` to a local CSV or retry with EDAV access."
+        ))
+      }
+    )
+  } else if (!is.null(lab_locs_path)) {
+    readr::read_csv(lab_locs_path, show_col_types = FALSE)
+  } else {
+    cli::cli_abort("Please provide `lab_locs_path` when `use_edav = FALSE`.")
   }
 
-  readr::read_csv(lab_locs_path, show_col_types = FALSE) |>
+  lab_locs |>
     dplyr::mutate(country = stringr::str_to_upper(country)) |>
     dplyr::filter(!is.na(country)) |>
     dplyr::mutate(seq.capacity = stringr::str_to_lower(seq.capacity))
 }
+
 
 #' Apply shared sequencing routing updates
 #' @param lab_data `tibble`
@@ -211,7 +224,7 @@ apply_lab_cleaning_updates <- function(lab_data) {
 #' @returns `tibble`
 #' @keywords internal
 clean_lab_data_who <- function(lab_data, start_date, end_date,
-                                   afp_data = NULL, ctry_name = NULL) {
+                               afp_data = NULL, ctry_name = NULL) {
   start_date <- lubridate::as_date(start_date)
   end_date <- lubridate::as_date(end_date)
 
@@ -271,13 +284,14 @@ clean_lab_data_who <- function(lab_data, start_date, end_date,
 #' @returns `tibble`
 #' @keywords internal
 clean_lab_data_regional <- function(lab_data,
-                                        start_date, end_date,
-                                        afp_data = NULL,
-                                        ctry_name = NULL,
-                                        lab_locs_path = NULL) {
+                                    start_date, end_date,
+                                    afp_data = NULL,
+                                    ctry_name = NULL,
+                                    use_edav = TRUE,
+                                    lab_locs_path = NULL) {
   start_date <- lubridate::as_date(start_date)
   end_date <- lubridate::as_date(end_date)
-  lab_locs <- get_lab_locs(lab_locs_path)
+  lab_locs <- get_lab_locs(lab_locs_path, use_edav)
 
   out <- dplyr::rename_with(lab_data, recode, Name = "country") |>
     dplyr::mutate(
@@ -354,12 +368,16 @@ clean_lab_data_regional <- function(lab_data,
 clean_lab_data <- function(lab_data, start_date, end_date,
                            afp_data = NULL, ctry_name = NULL,
                            lab_locs_path = NULL,
+                           use_edav = TRUE,
                            save_rda_path = NULL) {
   out <- if ("MasterKey" %in% names(lab_data)) {
     clean_lab_data_who(lab_data, start_date, end_date, afp_data, ctry_name) |>
       add_rolling_years(start_date, end_date, "DateOfOnset")
   } else {
-    clean_lab_data_regional(lab_data, start_date, end_date, afp_data, ctry_name, lab_locs_path) |>
+    clean_lab_data_regional(
+      lab_data, start_date, end_date,
+      afp_data, ctry_name, lab_locs_path, use_edav
+    ) |>
       add_rolling_years(start_date, end_date, "CaseDate")
   }
 
@@ -462,8 +480,8 @@ clean_lab_data <- function(lab_data, start_date, end_date,
 
   # .rda output
   if (!is.null(save_rda_path)) {
-    cleaned_lab_data <- out
-    save(cleaned_lab_data, file = save_rda_path)
+    lab_clean_all <- out
+    save(lab_clean_all, file = save_rda_path)
   }
 
   out
@@ -500,4 +518,3 @@ load_lab_data <- function(lab_data_path, sheet_name = NULL) {
     stop("Not a csv or .xlsx file. Please try again.")
   }
 }
-
