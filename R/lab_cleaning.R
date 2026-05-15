@@ -79,6 +79,63 @@ normalize_regional_country <- function(country_name) {
   )
 }
 
+#' Adjust rolling-year end period for analysis end date
+#' @param data `tibble` Output that already includes rolling-year columns.
+#' @param end_date `str` Analysis end date.
+#' @param date_col `str` Date column used for rolling-year assignment.
+#' @returns `tibble`
+#' @keywords internal
+adjust_rolling_years <- function(data, end_date, date_col) {
+  if (!"rolling_period" %in% names(data)) {
+    cli::cli_abort("Please pass data with rolling period columns added.")
+  }
+
+  end_date <- lubridate::as_date(end_date)
+
+  latest_period <- data |>
+    dplyr::select(
+      year_label, rolling_period,
+      analysis_year_start, analysis_year_end
+    ) |>
+    dplyr::distinct() |>
+    dplyr::mutate(
+      year_number = as.integer(stringr::str_extract(year_label, "[-+]?\\d+"))
+    ) |>
+    dplyr::filter(year_number == max(year_number, na.rm = TRUE))
+
+  if (is.na(max(data[[date_col]], na.rm = TRUE))) {
+    cli::cli_alert(paste0("'", date_col, "'", " is an empty vector."))
+    return(data)
+  }
+
+  data |>
+    dplyr::mutate(
+      year_number = as.integer(stringr::str_extract(year_label, "[-+]?\\d+"))
+    ) |>
+    dplyr::filter(
+      !!rlang::sym(date_col) <= end_date,
+      year_number > 0
+    ) |>
+    dplyr::mutate(
+      analysis_year_end = dplyr::if_else(
+        year_label == latest_period$year_label,
+        end_date,
+        analysis_year_end
+      ),
+      rolling_period = dplyr::if_else(
+        year_label == latest_period$year_label,
+        paste0(
+          lubridate::month(.data$analysis_year_start, label = TRUE, abbr = TRUE),
+          " ", lubridate::year(.data$analysis_year_start),
+          " - ",
+          lubridate::month(.data$analysis_year_end, label = TRUE, abbr = TRUE),
+          " ", lubridate::year(.data$analysis_year_end)
+        ),
+        rolling_period
+      )
+    )
+}
+
 #' Add rolling years for output
 #' @param df `tibble`
 #' @param start_date `str`
