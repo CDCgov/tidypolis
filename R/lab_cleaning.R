@@ -1,8 +1,8 @@
 #' Tidypolis lab cleaning
 #'
-#' Self-contained lab cleaning helpers intended to be copied into tidypolis.
+#' Self-contained lab cleaning helpers for tidypolis.
 #' These functions do not call `clean_lab_data()` or other helpers from
-#' `R/dr.lab.functions.R`.
+#'
 #'
 #' @keywords internal
 NULL
@@ -14,10 +14,12 @@ NULL
 #' @returns `chr` Uppercase vector of countries.
 #' @keywords internal
 normalize_lab_ctry_filter <- function(ctry_name) {
+  #If no country filter was supplied, return NULL unchanged.
   if (is.null(ctry_name)) {
     return(NULL)
   }
 
+  #Standardize case/whitespace and allow comma-delimited filters.
   stringr::str_to_upper(stringr::str_trim(ctry_name)) |>
     stringr::str_replace_all(", ", ",") |>
     stringr::str_split(",") |>
@@ -29,6 +31,7 @@ normalize_lab_ctry_filter <- function(ctry_name) {
 #' @returns `chr` Region code.
 #' @keywords internal
 get_region <- function(country_name) {
+  #Normalize to uppercase trimmed names for stable matching.
   country_name <- stringr::str_trim(stringr::str_to_upper(country_name))
   emro_ctry <- c(
     "AFGHANISTAN", "BAHRAIN", "DJIBOUTI", "EGYPT", "IRAN (ISLAMIC REPUBLIC OF)",
@@ -38,6 +41,7 @@ get_region <- function(country_name) {
     "UNITED ARAB EMIRATES", "YEMEN"
   )
 
+  #Minimal binary resolver: EMRO if listed, otherwise AFRO.
   dplyr::if_else(country_name %in% emro_ctry, "EMRO", "AFRO")
 }
 
@@ -46,6 +50,7 @@ get_region <- function(country_name) {
 #' @returns `chr`
 #' @keywords internal
 normalize_regional_country <- function(country_name) {
+  #Harmonize regional 3-letter codes/aliases into canonical names.
   dplyr::case_match(
     stringr::str_to_upper(country_name),
     "AFG" ~ "AFGHANISTAN",
@@ -83,9 +88,11 @@ normalize_regional_country <- function(country_name) {
 #' @keywords internal
 add_rolling_years <- function(df, start_date, end_date, date_col,
                               period = lubridate::years(1)) {
+  #Anchor rolling-year math on normalized start_date.
   start_date <- lubridate::as_date(start_date)
 
   # Normalize input date column defensively to Date
+  #Ensure the selected date column is truly Date-like before intervals.
   df <- df |>
     dplyr::mutate(
       !!rlang::sym(date_col) := as.Date(as.character(.data[[date_col]]))
@@ -94,10 +101,12 @@ add_rolling_years <- function(df, start_date, end_date, date_col,
   n_rows <- nrow(df)
   n_row_col <- sum(is.na(df[[date_col]]))
 
+  #Hard fail if the chosen date column is entirely missing.
   if (n_rows == n_row_col) {
     cli::cli_abort("The date_col selected is an NA vector. Please check your data.")
   }
 
+  #Build interval index, year labels, and display rolling period text.
   df <- df |>
     dplyr::mutate(
       date_interval = lubridate::interval(start_date, !!rlang::sym(date_col)),
@@ -139,6 +148,7 @@ add_rolling_years <- function(df, start_date, end_date, date_col,
     ) |>
     dplyr::select(-"year_num")
 
+  #Delegate any end-date capping/trimming to shared helper.
   df <- adjust_rolling_years(df, end_date, date_col)
 
   return(df)
@@ -150,10 +160,12 @@ add_rolling_years <- function(df, start_date, end_date, date_col,
 #' @returns `tibble`
 #' @keywords internal
 impute_missing_lab_geo <- function(lab_data, afp_data = NULL) {
+  #Backfill EPID name variant used in some extracts.
   if (!"EPID" %in% names(lab_data) && "EpidNumber" %in% names(lab_data)) {
-    lab_data <- dplyr::rename_with(lab_data, dply::recode, EpidNumber = "EPID")
+    lab_data <- dplyr::rename_with(lab_data, dplyr::recode, EpidNumber = "EPID")
   }
 
+  #If no AFP data, add empty geo columns and return as-is.
   if (is.null(afp_data)) {
     lab_data$ctry <- NA
     lab_data$prov <- NA
@@ -164,12 +176,14 @@ impute_missing_lab_geo <- function(lab_data, afp_data = NULL) {
     return(lab_data)
   }
 
+  #Normalize AFP place column names to match downstream expectations.
   afp_data <- dplyr::rename_with(afp_data, dplyr::recode,
                                  place.admin.0 = "ctry",
                                  place.admin.1 = "prov",
                                  place.admin.2 = "dist"
   )
 
+  #If EPID is still absent in lab_data, cannot join; return empty geo cols.
   if (!"EPID" %in% names(lab_data)) {
     lab_data$ctry <- NA
     lab_data$prov <- NA
@@ -180,6 +194,7 @@ impute_missing_lab_geo <- function(lab_data, afp_data = NULL) {
     return(lab_data)
   }
 
+  #Match by EPID and copy location/admin hierarchy fields across.
   match_idx <- match(as.character(lab_data$EPID), as.character(afp_data$epid))
   lab_data$ctry <- afp_data$ctry[match_idx]
   lab_data$prov <- afp_data$prov[match_idx]
@@ -197,6 +212,7 @@ impute_missing_lab_geo <- function(lab_data, afp_data = NULL) {
 #' @returns `tibble`
 #' @keywords internal
 get_lab_locs <- function(lab_locs_path = NULL, use_edav = TRUE) {
+  #Prefer EDAV default source unless explicit local path supplied.
   lab_locs <- if (is.null(lab_locs_path) && use_edav) {
     tryCatch(
       sirfunctions::edav_io("read", file_loc = "Data/lab/Routine_lab_testing_locations.csv"),
@@ -213,6 +229,7 @@ get_lab_locs <- function(lab_locs_path = NULL, use_edav = TRUE) {
     cli::cli_abort("Please provide `lab_locs_path` when `use_edav = FALSE`.")
   }
 
+  #Standardize casing and drop rows without a country key.
   lab_locs |>
     dplyr::mutate(country = stringr::str_to_upper(country)) |>
     dplyr::filter(!is.na(country)) |>
@@ -225,6 +242,7 @@ get_lab_locs <- function(lab_locs_path = NULL, use_edav = TRUE) {
 #' @returns `tibble`
 #' @keywords internal
 apply_lab_cleaning_updates <- function(lab_data) {
+  #Ensure expected routing flag columns exist before conditional updates.
   if (!"seq.cat" %in% names(lab_data)) {
     lab_data$seq.cat <- NA_character_
   }
@@ -232,6 +250,7 @@ apply_lab_cleaning_updates <- function(lab_data) {
     lab_data$seq.capacity <- NA_character_
   }
 
+  #Apply date-bounded routing overrides and post-cutover sequencing flags.
   lab_data |>
     dplyr::mutate(seq.lab = dplyr::case_when(
       seq.lab == "NICD-South Africa" & DateStoolCollected <= lubridate::as_date("2025-02-01") & culture.itd.lab == "Cameroon" ~ "CDC-Atlanta",
@@ -267,20 +286,24 @@ apply_lab_cleaning_updates <- function(lab_data) {
 #' @keywords internal
 clean_lab_data_who <- function(lab_data, start_date, end_date,
                                afp_data = NULL, ctry_name = NULL) {
+  #Normalize analysis window inputs.
   start_date <- lubridate::as_date(start_date)
   end_date <- lubridate::as_date(end_date)
 
+  #Parse all Date* columns defensively across common date formats.
   lab_data <- lab_data |>
     dplyr::mutate(dplyr::across(
       dplyr::starts_with("Date"),
       \(x) as.Date.character(x, tryFormats = c("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y"), optional = TRUE)
     ))
 
+  #Derive year if missing to support year-based filtering.
   if (!"year" %in% names(lab_data)) {
     lab_data <- lab_data |>
       dplyr::mutate(year = lubridate::year(DateOfOnset))
   }
 
+  #Compute turnaround metrics then filter to case records in range.
   out <- lab_data |>
     dplyr::mutate(
       days.collect.lab = DateStoolReceivedinLab - DateStoolCollected,
@@ -296,16 +319,19 @@ clean_lab_data_who <- function(lab_data, start_date, end_date,
       CaseOrContact == "1-Case"
     )
 
+  #Fill geography from AFP linkage and derive WHO region.
   out <- impute_missing_lab_geo(out, afp_data)
   out <- out |>
     dplyr::mutate(whoregion = get_region(ctry))
 
+  #Optional country filter (supports comma-delimited text input).
   if (!is.null(ctry_name)) {
     ctry_name <- normalize_lab_ctry_filter(ctry_name)
     out <- out |>
       dplyr::filter(ctry %in% ctry_name | is.na(ctry))
   }
 
+  #Add additional field-to-lab transport timing metrics.
   out |>
     dplyr::mutate(
       days.coll.sent.field = as.numeric(DateStoolSentfromField - DateStoolCollected),
@@ -331,10 +357,13 @@ clean_lab_data_regional <- function(lab_data,
                                     ctry_name = NULL,
                                     lab_locs_path = NULL,
                                     use_edav = TRUE) {
+  #Normalize date bounds and load lab routing metadata.
   start_date <- lubridate::as_date(start_date)
   end_date <- lubridate::as_date(end_date)
   lab_locs <- get_lab_locs(lab_locs_path, use_edav)
 
+  #Standardize columns/dates, normalize country, join routing lookups,
+  #then filter to valid specimen records.
   out <- dplyr::rename_with(lab_data, dplyr::recode, Name = "country") |>
     dplyr::mutate(
       dplyr::across(dplyr::any_of(c(
@@ -381,6 +410,7 @@ clean_lab_data_regional <- function(lab_data,
     )
 
   # Option B: apply stool/onset filter only if it keeps rows
+  #Use protective logic to avoid accidentally dropping all rows.
   out_candidate <- out |>
     dplyr::filter(DateStoolCollected >= ParalysisOnsetDate | is.na(ParalysisOnsetDate))
 
@@ -392,9 +422,11 @@ clean_lab_data_regional <- function(lab_data,
     )
   }
 
+  #Remove intratype detail columns not needed in cleaned regional output.
   out <- out |>
     dplyr::select(-dplyr::contains("cIntratypeIs"))
 
+  #Impute missing geography and apply optional country filter.
   out <- impute_missing_lab_geo(out, afp_data)
 
   if (!is.null(ctry_name)) {
@@ -403,6 +435,7 @@ clean_lab_data_regional <- function(lab_data,
       dplyr::filter(ctry %in% ctry_name | is.na(ctry))
   }
 
+  #Keep WHO-compatible delay fields present even when unavailable regionally.
   out |>
     dplyr::mutate(
       days.coll.sent.field = NA,
@@ -429,6 +462,8 @@ clean_lab_data <- function(lab_data, start_date, end_date,
                            lab_locs_path = NULL,
                            use_edav = TRUE,
                            save_rda_path = NULL) {
+  #Dispatch to WHO cleaner when MasterKey schema is present,
+  #otherwise use regional cleaner; then add rolling-year labels.
   out <- if ("MasterKey" %in% names(lab_data)) {
     clean_lab_data_who(lab_data, start_date, end_date, afp_data, ctry_name) |>
       add_rolling_years(start_date, end_date, "DateOfOnset")
@@ -440,9 +475,12 @@ clean_lab_data <- function(lab_data, start_date, end_date,
       add_rolling_years(start_date, end_date, "CaseDate")
   }
 
+  #Apply shared sequencing-routing updates used by both pipelines.
   out <- apply_lab_cleaning_updates(out)
 
   if (!"MasterKey" %in% names(lab_data)) {
+    #Regional harmonization block: normalize key IDs/country/region,
+    #guarantee expected column set, and coerce key types.
     if (!"EPID" %in% names(out) && "EpidNumber" %in% names(out)) {
       out$EPID <- as.character(out$EpidNumber)
     }
@@ -538,6 +576,7 @@ clean_lab_data <- function(lab_data, start_date, end_date,
   }
 
   # .rda output
+  #Optional side-effect to save cleaned output object.
   if (!is.null(save_rda_path)) {
     lab_clean_all <- out
     save(lab_clean_all, file = save_rda_path)
@@ -563,12 +602,14 @@ clean_lab_data <- function(lab_data, start_date, end_date,
 #'
 #' @export
 load_lab_data <- function(lab_data_path, sheet_name = NULL) {
+  #Guard dependency so CSV-only users get a clear error for xlsx paths.
   if (!requireNamespace("readxl", quietly = TRUE)) {
     stop('Package "readxl" must be installed to use this function.',
          .call = FALSE
     )
   }
 
+  #Extension-based dispatch between CSV and Excel readers.
   if (stringr::str_ends(lab_data_path, ".csv")) {
     return(readr::read_csv(lab_data_path))
   } else if (stringr::str_ends(lab_data_path, ".xlsx")) {
