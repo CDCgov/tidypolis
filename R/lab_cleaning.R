@@ -557,8 +557,12 @@ clean_lab_data <- function(lab_data, start_date, end_date,
       )
     }
     out$country <- stringr::str_to_upper(out$country)
+
     if (!"Name" %in% names(out) && "country" %in% names(out)) {
       out$Name <- out$country
+    }
+    if (!"ctry" %in% names(out) && "country" %in% names(out)) {
+      out$ctry <- out$country
     }
     if ("region" %in% names(out)) {
       out$region <- dplyr::coalesce(
@@ -579,14 +583,18 @@ clean_lab_data <- function(lab_data, start_date, end_date,
     missing_cols <- setdiff(
       c(
         "EPID", "SpecimenNumber", "CaseContactCode", "Name", "CaseDate",
-        "ParalysisOnsetDate", "DateStoolCollected", "StoolDateSentToLab",
-        "DateStoolReceivedinLab", "FinalCellCultureResult", "DateFinalCellCultureResult",
-        "FinalITDResult", "DateFinalrRTPCRResults", "DateIsolateSentforSequencing",
+        "ParalysisOnsetDate", "DateOfOnset", "DateStoolCollected",
+        "StoolDateSentToLab", "DateStoolSentToLab", "DateStoolReceivedinLab",
+        "FinalCellCultureResult", "DateFinalCellCultureResult",
+        "DateFinalCellCultureResults", "FinalITDResult",
+        "DateFinalrRTPCRResults", "DateIsolateSentforSequencing",
         "ReportDateSequenceResultSent", "DateIsolateRcvdForSeq", "DateLArmIsolate",
         "DateRArmIsolate", "ResultNPENT", "cIntratypeIsV1", "cIntratypeIsV2",
         "cIntratypeIsV3", "cIntratypeIsVDPV1", "cIntratypeIsVDPV2", "cIntratypeIsVDPV3",
         "cIntratypeIsW1", "cIntratypeIsW2", "cIntratypeIsW3", "DateofSequencing",
-        "DateNotificationtoHQ", "WILD1", "VDPV1", "VDPV2", "VDPV3", "region"
+        "DateSeqResult", "DateNotificationtoHQ", "WILD1", "VDPV1", "VDPV2",
+        "VDPV3", "region", "whoregion", "ctry", "prov", "dist", "adm0guid",
+        "adm1guid", "adm2guid"
       ),
       names(out)
     )
@@ -598,10 +606,12 @@ clean_lab_data <- function(lab_data, start_date, end_date,
       dplyr::mutate(
         dplyr::across(
           dplyr::any_of(c(
-            "CaseDate", "ParalysisOnsetDate", "DateStoolCollected", "StoolDateSentToLab",
-            "DateStoolReceivedinLab", "DateFinalCellCultureResult", "DateFinalrRTPCRResults",
-            "ReportDateSequenceResultSent", "DateIsolateRcvdForSeq", "DateLArmIsolate",
-            "DateRArmIsolate", "DateofSequencing"
+            "CaseDate", "ParalysisOnsetDate", "DateOfOnset", "DateStoolCollected",
+            "StoolDateSentToLab", "DateStoolSentToLab", "DateStoolReceivedinLab",
+            "DateFinalCellCultureResult", "DateFinalCellCultureResults",
+            "DateFinalrRTPCRResults", "ReportDateSequenceResultSent",
+            "DateIsolateRcvdForSeq", "DateLArmIsolate", "DateRArmIsolate",
+            "DateofSequencing", "DateSeqResult"
           )),
           ~as.POSIXct(.x, tz = "UTC")
         ),
@@ -616,20 +626,28 @@ clean_lab_data <- function(lab_data, start_date, end_date,
             dplyr::if_else(!is.na(.x) & val != "" & !val %in% c("0", "FALSE", "F", "NO", "N", "NA", "N/A", "NULL", ".", "-"), TRUE, NA)
           }
         )
+      ) |>
+      dplyr::relocate(
+        dplyr::any_of(c(
+          "EPID", "SpecimenNumber", "CaseContactCode", "country", "Name", "ctry",
+          "prov", "dist", "whoregion", "region", "CaseDate", "ParalysisOnsetDate",
+          "DateOfOnset", "DateStoolCollected", "StoolDateSentToLab",
+          "DateStoolSentToLab", "DateStoolReceivedinLab",
+          "FinalCellCultureResult", "DateFinalCellCultureResult",
+          "DateFinalCellCultureResults", "FinalITDResult", "DateFinalrRTPCRResults",
+          "DateIsolateSentforSequencing", "ReportDateSequenceResultSent",
+          "DateIsolateRcvdForSeq", "DateLArmIsolate", "DateRArmIsolate",
+          "DateofSequencing", "DateSeqResult", "ResultNPENT", "WILD1", "VDPV1",
+          "VDPV2", "VDPV3", "days.collect.lab", "days.lab.culture",
+          "days.seq.ship", "days.lab.seq", "days.itd.seqres", "days.itd.arriveseq",
+          "days.seq.rec.res", "days.coll.sent.field", "days.sent.field.rec.nat",
+          "days.rec.nat.sent.lab", "days.sent.lab.rec.lab", "days.rec.lab.culture",
+          "year_label", "rolling_period", "analysis_year_start", "analysis_year_end",
+          "seq.capacity", "seq.lab", "culture.itd.lab", "seq.cat"
+        ))
+
       )
 
-    out <- out |>
-      dplyr::select(dplyr::any_of(c(
-        "EPID", "SpecimenNumber", "CaseContactCode", "Name", "CaseDate",
-        "ParalysisOnsetDate", "DateStoolCollected", "StoolDateSentToLab",
-        "DateStoolReceivedinLab", "FinalCellCultureResult", "DateFinalCellCultureResult",
-        "FinalITDResult", "DateFinalrRTPCRResults", "DateIsolateSentforSequencing",
-        "ReportDateSequenceResultSent", "DateIsolateRcvdForSeq", "DateLArmIsolate",
-        "DateRArmIsolate", "ResultNPENT", "cIntratypeIsV1", "cIntratypeIsV2",
-        "cIntratypeIsV3", "cIntratypeIsVDPV1", "cIntratypeIsVDPV2", "cIntratypeIsVDPV3",
-        "cIntratypeIsW1", "cIntratypeIsW2", "cIntratypeIsW3", "DateofSequencing",
-        "DateNotificationtoHQ", "WILD1", "VDPV1", "VDPV2", "VDPV3", "region"
-      )))
   }
 
   # .rda output
