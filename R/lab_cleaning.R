@@ -519,9 +519,10 @@ clean_lab_data <- function(lab_data, start_date, end_date,
                            lab_locs_path = NULL,
                            use_edav = TRUE,
                            save_rda_path = NULL) {
+  input_has_master_key <- "MasterKey" %in% names(lab_data)
   #Dispatch to WHO cleaner when MasterKey schema is present,
   #otherwise use regional cleaner; then add rolling-year labels.
-  out <- if ("MasterKey" %in% names(lab_data)) {
+  lab_data <- if (input_has_master_key) {
     clean_lab_data_who(lab_data, start_date, end_date, afp_data, ctry_name) |>
       add_rolling_years(start_date, end_date, "DateOfOnset")
   } else {
@@ -533,51 +534,52 @@ clean_lab_data <- function(lab_data, start_date, end_date,
   }
 
   #Apply shared sequencing-routing updates used by both pipelines.
-  out <- apply_lab_cleaning_updates(out)
+  lab_data <- apply_lab_cleaning_updates(lab_data)
 
-  if (!"MasterKey" %in% names(lab_data)) {
-    #Regional harmonization block: normalize key IDs/country/region,
-    #guarantee expected column set, and coerce key types.
-    if (!"EPID" %in% names(out) && "EpidNumber" %in% names(out)) {
-      out$EPID <- as.character(out$EpidNumber)
+  if (!input_has_master_key) {
+    #Regional harmonization block: normalize key IDs/country/region and add
+    #WHO/sirfunctions-compatible aliases while preserving the derived fields
+    #created above (turnaround metrics, rolling-year labels, and routing cols).
+    if (!"EPID" %in% names(lab_data) && "EpidNumber" %in% names(lab_data)) {
+      lab_data$EPID <- as.character(lab_data$EpidNumber)
     }
-    if ("EPID" %in% names(out) && "EpidNumber" %in% names(out)) {
-      out$EPID <- dplyr::coalesce(as.character(out$EPID), as.character(out$EpidNumber))
+    if ("EPID" %in% names(lab_data) && "EpidNumber" %in% names(lab_data)) {
+      lab_data$EPID <- dplyr::coalesce(as.character(lab_data$EPID), as.character(lab_data$EpidNumber))
     }
-    if (!"country" %in% names(out)) {
-      out$country <- dplyr::coalesce(
-        if ("ctry" %in% names(out)) out$ctry else NA_character_,
-        if ("Name" %in% names(out)) out$Name else NA_character_
+    if (!"country" %in% names(lab_data)) {
+      lab_data$country <- dplyr::coalesce(
+        if ("ctry" %in% names(lab_data)) lab_data$ctry else NA_character_,
+        if ("Name" %in% names(lab_data)) lab_data$Name else NA_character_
       )
     } else {
-      out$country <- dplyr::coalesce(
-        out$country,
-        if ("ctry" %in% names(out)) out$ctry else NA_character_,
-        if ("Name" %in% names(out)) out$Name else NA_character_
+      lab_data$country <- dplyr::coalesce(
+        lab_data$country,
+        if ("ctry" %in% names(lab_data)) lab_data$ctry else NA_character_,
+        if ("Name" %in% names(lab_data)) lab_data$Name else NA_character_
       )
     }
-    out$country <- stringr::str_to_upper(out$country)
+    lab_data$country <- stringr::str_to_upper(lab_data$country)
 
-    if (!"Name" %in% names(out) && "country" %in% names(out)) {
-      out$Name <- out$country
+    if (!"Name" %in% names(lab_data) && "country" %in% names(lab_data)) {
+      lab_data$Name <- lab_data$country
     }
-    if (!"ctry" %in% names(out) && "country" %in% names(out)) {
-      out$ctry <- out$country
+    if (!"ctry" %in% names(lab_data) && "country" %in% names(lab_data)) {
+      lab_data$ctry <- lab_data$country
     }
-    if ("region" %in% names(out)) {
-      out$region <- dplyr::coalesce(
-        out$region,
-        if ("whoregion" %in% names(out)) out$whoregion else NA_character_,
-        if ("country" %in% names(out)) get_region(out$country) else NA_character_,
-        if ("ctry" %in% names(out)) get_region(out$ctry) else NA_character_,
-        if ("Name" %in% names(out)) get_region(out$Name) else NA_character_
+    if ("region" %in% names(lab_data)) {
+      lab_data$region <- dplyr::coalesce(
+        lab_data$region,
+        if ("whoregion" %in% names(lab_data)) lab_data$whoregion else NA_character_,
+        if ("country" %in% names(lab_data)) get_region(lab_data$country) else NA_character_,
+        if ("ctry" %in% names(lab_data)) get_region(lab_data$ctry) else NA_character_,
+        if ("Name" %in% names(lab_data)) get_region(lab_data$Name) else NA_character_
       )
     } else {
-      out$region <- dplyr::coalesce(
-        if ("whoregion" %in% names(out)) out$whoregion else NA_character_,
-        if ("country" %in% names(out)) get_region(out$country) else NA_character_,
-        if ("ctry" %in% names(out)) get_region(out$ctry) else NA_character_,
-        if ("Name" %in% names(out)) get_region(out$Name) else NA_character_
+      lab_data$region <- dplyr::coalesce(
+        if ("whoregion" %in% names(lab_data)) lab_data$whoregion else NA_character_,
+        if ("country" %in% names(lab_data)) get_region(lab_data$country) else NA_character_,
+        if ("ctry" %in% names(lab_data)) get_region(lab_data$ctry) else NA_character_,
+        if ("Name" %in% names(lab_data)) get_region(lab_data$Name) else NA_character_
       )
     }
     missing_cols <- setdiff(
@@ -596,13 +598,13 @@ clean_lab_data <- function(lab_data, start_date, end_date,
         "VDPV3", "region", "whoregion", "ctry", "prov", "dist", "adm0guid",
         "adm1guid", "adm2guid"
       ),
-      names(out)
+      names(lab_data)
     )
     for (col in missing_cols) {
-      out[[col]] <- NA
+      lab_data[[col]] <- NA
     }
 
-    out <- out |>
+    lab_data <- lab_data |>
       dplyr::mutate(
         dplyr::across(
           dplyr::any_of(c(
@@ -653,11 +655,11 @@ clean_lab_data <- function(lab_data, start_date, end_date,
   # .rda output
   #Optional side-effect to save cleaned output object.
   if (!is.null(save_rda_path)) {
-    lab_clean_all <- out
-    save(lab_clean_all, file = save_rda_path)
+    lab_data <- lab_data
+    save(lab_data, file = save_rda_path)
   }
 
-  out
+  lab_data
 }
 
 #' Function to load the raw lab data locally
