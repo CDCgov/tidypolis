@@ -217,13 +217,19 @@ add_rolling_years <- function(df, start_date, end_date, date_col,
 #' @returns `tibble`
 #' @keywords internal
 impute_missing_lab_geo <- function(lab_data, afp_data = NULL) {
-  #Backfill EPID name variant used in some extracts.
+  #Match sirfunctions naming: keep `EpidNumber` as the canonical EPID field
+  #while preserving `EPID` for regional filters that already use it.
+  if (!"EpidNumber" %in% names(lab_data) && "EPID" %in% names(lab_data)) {
+    lab_data$EpidNumber <- lab_data$EPID
+  }
   if (!"EPID" %in% names(lab_data) && "EpidNumber" %in% names(lab_data)) {
-    lab_data <- dplyr::rename_with(lab_data, dplyr::recode, EpidNumber = "EPID")
+    lab_data$EPID <- lab_data$EpidNumber
   }
 
-  #If no AFP data, add empty geo columns and return as-is.
-  if (is.null(afp_data)) {
+  lab_data <- add_epid_components(lab_data)
+
+  #If EpidNumber is still absent in lab_data, cannot join; return empty geo cols.
+  if (!"EpidNumber" %in% names(lab_data)) {
     lab_data$ctry <- NA
     lab_data$prov <- NA
     lab_data$dist <- NA
