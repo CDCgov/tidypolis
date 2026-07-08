@@ -211,6 +211,42 @@ add_rolling_years <- function(df, start_date, end_date, date_col,
   return(df)
 }
 
+#' Remove future values from date/date-time columns
+#' @param data `tibble`
+#' @param today `Date` Date used as the future-date cutoff.
+#' @returns `tibble`
+#' @keywords internal
+remove_future_lab_dates <- function(data, today = Sys.Date()) {
+  date_cols <- names(data)[
+    vapply(
+      data,
+      \(x) inherits(x, "Date") || inherits(x, "POSIXt"),
+      logical(1)
+    ) |
+      stringr::str_detect(
+        names(data),
+        "(^Date|Date$|Date|StoolDateSentToLab|ParalysisOnsetDate|CaseDate|ReportDateSequenceResultSent)"
+      )
+  ]
+
+  if (length(date_cols) == 0) {
+    return(data)
+  }
+
+  today <- lubridate::as_date(today)
+
+  data |>
+    dplyr::mutate(dplyr::across(
+      dplyr::all_of(date_cols),
+      \(x) {
+        parsed_x <- suppressWarnings(lubridate::as_date(x))
+        future_idx <- !is.na(parsed_x) & parsed_x > today
+        x[future_idx] <- NA
+        x
+      }
+    ))
+}
+
 #' Impute missing country/province/district using AFP line list
 #' @param lab_data `tibble`
 #' @param afp_data `tibble`
@@ -459,13 +495,13 @@ apply_lab_cleaning_updates <- function(lab_data) {
   #Apply date-bounded routing overrides and post-cutover sequencing flags.
   lab_data |>
     dplyr::mutate(seq.lab = dplyr::case_when(
-      seq.lab == "NICD-South Africa" & DateStoolCollected <= lubridate::as_date("2025-02-01") & culture.itd.lab == "Cameroon" ~ "CDC-Atlanta",
-      seq.lab == "UVRI-Uganda" & DateStoolCollected <= lubridate::as_date("2025-02-01") & culture.itd.lab == "ETHIOPIA/ KEMRI-Kenya" ~ "CDC-Atlanta",
-      seq.lab == "Ibadan-Nigeria" & DateStoolCollected <= lubridate::as_date("2025-02-01") & culture.itd.lab %in% c("Ibadan-Nigeria, Maiduguri-Nigeria", "Nigeria") ~ "CDC-Atlanta",
-      seq.lab == "UVRI-Uganda" & DateStoolCollected <= lubridate::as_date("2025-02-01") & culture.itd.lab == "KEMRI-Kenya" ~ "CDC-Atlanta",
-      seq.lab == "UVRI-Uganda" & country == "UGANDA" & DateStoolCollected <= lubridate::as_date("2025-02-01") ~ "CDC-Atlanta",
-      seq.lab == "NICD-South Africa" & DateStoolCollected <= lubridate::as_date("2025-02-01") & culture.itd.lab == "Senegal" ~ "CDC-Atlanta",
-      seq.lab == "Varied (UVRI/ Oman/ Jordan)" & DateStoolCollected <= lubridate::as_date("2025-02-01") & culture.itd.lab == "Varied (KEMRI-Kenya/ Oman/ Jordan)" ~ "CDC-Atlanta",
+      seq.lab == "NICD-South Africa" & DateStoolCollected < lubridate::as_date("2025-03-01") & culture.itd.lab == "Cameroon" ~ "CDC-Atlanta",
+      seq.lab == "UVRI-Uganda" & DateStoolCollected < lubridate::as_date("2025-03-01") & culture.itd.lab == "ETHIOPIA/ KEMRI-Kenya" ~ "CDC-Atlanta",
+      seq.lab == "Ibadan-Nigeria" & DateStoolCollected < lubridate::as_date("2025-03-01") & culture.itd.lab %in% c("Ibadan-Nigeria, Maiduguri-Nigeria", "Nigeria") ~ "CDC-Atlanta",
+      seq.lab == "UVRI-Uganda" & DateStoolCollected < lubridate::as_date("2025-03-01") & culture.itd.lab == "KEMRI-Kenya" ~ "CDC-Atlanta",
+      seq.lab == "UVRI-Uganda" & country == "UGANDA" & DateStoolCollected <= lubridate::as_date("2025-03-01") ~ "CDC-Atlanta",
+      seq.lab == "NICD-South Africa" & DateStoolCollected < lubridate::as_date("2025-03-01") & culture.itd.lab == "Senegal" ~ "CDC-Atlanta",
+      seq.lab == "Varied (UVRI/ Oman/ Jordan)" & DateStoolCollected < lubridate::as_date("2025-03-01") & culture.itd.lab == "Varied (KEMRI-Kenya/ Oman/ Jordan)" ~ "CDC-Atlanta",
       .default = seq.lab
     )) |>
     dplyr::mutate(seq.cat = dplyr::case_when(
@@ -501,7 +537,8 @@ clean_lab_data_who <- function(lab_data, start_date, end_date,
     dplyr::mutate(dplyr::across(
       dplyr::starts_with("Date"),
       \(x) as.Date.character(x, tryFormats = c("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y"), optional = TRUE)
-    ))
+    )) |>
+    remove_future_lab_dates()
 
   #Derive year if missing to support year-based filtering.
   if (!"year" %in% names(lab_data)) {
