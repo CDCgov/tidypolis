@@ -457,10 +457,15 @@ get_lab_locs <- function(lab_locs_path = NULL, use_edav = TRUE) {
   #Prefer EDAV default source unless explicit local path supplied.
   lab_locs <- if (is.null(lab_locs_path) && use_edav) {
     tryCatch(
-      sirfunctions::edav_io("read", file_loc = "Data/lab/Routine_lab_testing_locations.csv"),
+      {
+        cli::cli_process_start("Downloading lab testing location file from EDAV.")
+        lab_locs <- sirfunctions::edav_io("read", file_loc = "Data/lab/Routine_lab_testing_locations.csv")
+        cli::cli_process_done()
+        lab_locs
+      },
       error = \(e) {
         cli::cli_abort(c(
-          "Unable to read lab locations from EDAV default path.",
+          "Download of lab testing location file from EDAV failed.",
           "i" = "Set `lab_locs_path` to a local CSV or retry with EDAV access."
         ))
       }
@@ -472,10 +477,46 @@ get_lab_locs <- function(lab_locs_path = NULL, use_edav = TRUE) {
   }
 
   #Standardize casing and drop rows without a country key.
-  lab_locs |>
+  lab_locs <- lab_locs |>
     dplyr::mutate(country = stringr::str_to_upper(country)) |>
     dplyr::filter(!is.na(country)) |>
     dplyr::mutate(seq.capacity = stringr::str_to_lower(seq.capacity))
+
+  if ("wgs.lab*" %in% names(lab_locs)) {
+    lab_locs <- lab_locs |>
+      dplyr::mutate(
+        `wgs.lab*` = stringr::str_replace_all(`wgs.lab*`, "- ", "-"),
+        `wgs.lab*` = dplyr::case_when(
+          country == "OCCUPIED PALESTINIAN TERRITORY, INCLUDING EAST JERUSALEM" ~ "Unknown",
+          `wgs.lab*` %in% c("-", NA) ~ "Unknown",
+          .default = `wgs.lab*`
+        )
+      )
+  }
+  if ("culture.itd.lab" %in% names(lab_locs)) {
+    lab_locs <- lab_locs |>
+      dplyr::mutate(
+        culture.itd.lab = stringr::str_replace_all(culture.itd.lab, "- ", "-"),
+        culture.itd.lab = dplyr::case_when(
+          country == "OCCUPIED PALESTINIAN TERRITORY, INCLUDING EAST JERUSALEM" ~ "Jordan",
+          culture.itd.lab %in% c("-", NA) ~ "Unknown",
+          .default = culture.itd.lab
+        )
+      )
+  }
+  if ("seq.lab" %in% names(lab_locs)) {
+    lab_locs <- lab_locs |>
+      dplyr::mutate(
+        seq.lab = stringr::str_replace_all(seq.lab, "- ", "-"),
+        seq.lab = dplyr::case_when(
+          country == "OCCUPIED PALESTINIAN TERRITORY, INCLUDING EAST JERUSALEM" ~ "Jordan",
+          seq.lab %in% c("-", NA) ~ "Unknown",
+          .default = seq.lab
+        )
+      )
+  }
+
+  lab_locs
 }
 
 
@@ -599,231 +640,125 @@ clean_lab_data_regional <- function(lab_data,
                                     ctry_name = NULL,
                                     lab_locs_path = NULL,
                                     use_edav = TRUE) {
-  # Static vars
+  #Normalize date bounds and load lab routing metadata.
   start_date <- lubridate::as_date(start_date)
   end_date <- lubridate::as_date(end_date)
-  if (is.na(start_date) | is.na(end_date)) {
+  if (is.na(start_date) || is.na(end_date)) {
     cli::cli_abort("start_date and end_date must be in YYYY-MM-DD format.")
-    return(lab_data)
   }
-
   lab_locs <- get_lab_locs(lab_locs_path, use_edav)
 
-  lab_data <- dplyr::rename_with(lab_data, recode,
-                                 Name = "country"
-  )
-
-  lab_data <- lab_data |>
-    dplyr::mutate(country = dplyr::case_match(
-      country,
-      "AFG" ~ "AFGHANISTAN",
-      "BAH" ~ "BAHRAIN",
-      "DJI" ~ "DJIBOUTI",
-      "EGY" ~ "EGYPT",
-      "IRN" ~ "IRAN (ISLAMIC REPUBLIC OF)",
-      "IRQ" ~ "IRAQ",
-      "JOR" ~ "JORDAN",
-      "KUW" ~ "KUWAIT",
-      "LEB" ~ "LEBANON",
-      "LIB" ~ "LIBYA",
-      "MOR" ~ "MOROCCO",
-      "OMA" ~ "OMAN",
-      "PAK" ~ "PAKISTAN",
-      "PNA" ~ "OCCUPIED PALESTINIAN TERRITORY, INCLUDING EAST JERUSALEM",
-      "QAT" ~ "QATAR",
-      "SAA" ~ "SAUDI ARABIA",
-      "SOM" ~ "SOMALIA",
-      "SUD" ~ "SUDAN",
-      "SYR" ~ "SYRIAN ARAB REPUBLIC",
-      "TUN" ~ "TUNISIA",
-      "UAE" ~ "UNITED ARAB EMIRATES",
-      "YEM" ~ "YEMEN",
-      .default = country
-    ))
-
-  cli::cli_process_start("Converting date character columns to date types.")
-  lab_data <- lab_data |>
+  #Standardize columns/dates, normalize country, join routing lookups,
+  #then filter to valid specimen records.
+  out <- dplyr::rename_with(lab_data, dplyr::recode, Name = "country") |>
     dplyr::mutate(
       dplyr::across(dplyr::any_of(c(
-        "CaseDate",
-        "ParalysisOnsetDate",
-        "DateStoolCollected",
-        "StoolDateSentToLab",
-        "DateStoolReceivedinLab",
-        "DateFinalCellCultureResult",
-        "DateFinalrRTPCRResults",
-        "ReportDateSequenceResultSent",
-        "DateIsolateRcvdForSeq",
-        "DateLArmIsolate",
-        "DateRArmIsolate",
-        "DateofSequencing",
-        "DateNotificationtoHQ"
-      )), \(x) as.Date.character(x,
-                                 tryFormats = c(
-                                   "%Y-%m-%d",
-                                   "%Y/%m/%d",
-                                   "%m/%d/%Y"
-                                 ),
-                                 optional = T
-      ))
-    )
-  cli::cli_process_done()
-
-  cli::cli_process_start("Filtering to date range specified")
-  lab_data <- lab_data |>
-    dplyr::filter(dplyr::between(ParalysisOnsetDate, start_date, end_date))
-  cli::cli_process_done()
-
-  cli::cli_process_start("Deduplicating data")
-  lab_data2 <- lab_data |>
-    dplyr::distinct()
-
-  # Additional cleaning steps
-  # need data dictionary, in order to standardize names
-  lab_data3 <- lab_data2 |>
-    # Dropping rows with Specimen number 0 or >2
-    dplyr::filter(SpecimenNumber %in% c(1, 2)) |>
+        "CaseDate", "ParalysisOnsetDate", "DateStoolCollected", "StoolDateSentToLab",
+        "DateStoolReceivedinLab", "DateFinalCellCultureResult", "DateFinalrRTPCRResults",
+        "ReportDateSequenceResultSent", "DateIsolateRcvdForSeq", "DateLArmIsolate",
+        "DateRArmIsolate", "DateofSequencing", "DateNotificationtoHQ"
+      )), \(x) as.Date.character(
+        x,
+        tryFormats = c("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y"),
+        optional = TRUE
+      ))) |>
+    remove_future_lab_dates() |>
     dplyr::mutate(
-      country = stringr::str_to_upper(country),
-      country = ifelse(stringr::str_detect(country, "IVOIRE"),
-                       "COTE D IVOIRE", country
-      ),
+      country = normalize_regional_country(country),
+      country = ifelse(stringr::str_detect(country, "IVOIRE"), "COTE D IVOIRE", country),
       year = lubridate::year(ParalysisOnsetDate),
       whoregion = get_region(country)
-    )
-
-  lab_data4 <- lab_data3 |>
+    ) |>
     dplyr::left_join(
-      lab_locs |> dplyr::select("country":"num.ship.seq.samples")
+      lab_locs |>
+        dplyr::select(dplyr::any_of(c(
+          "country", "who.region", "culture.itd.lab", "seq.lab",
+          "wgs.lab*", "culture.itd.cat", "seq.capacity",
+          "num.ship.seq.samples"
+        ))),
+      by = "country"
     ) |>
-    dplyr::group_by(EPID, SpecimenNumber) %>%
-    dplyr::mutate(n = dplyr::n()) %>%
-    dplyr::ungroup()
-
-  lab_data4 <- lab_data4 |>
-    dplyr::mutate(culture.itd.lab = dplyr::case_when(
-      country == "NIGERIA" ~ "Nigeria",
-      culture.itd.lab == "NOGUCHI- Ghana" ~ "NOGUCHI-Ghana",
-      .default = culture.itd.lab
-    ))
-
-  # Seperate blank epids from rest of lab_data4 in order to de-dupe
-  # based on epid and specimen number, join back after dedup
-  blank_epid <- lab_data4 |>
-    dplyr::filter(is.na(EPID))
-
-  lab_data4 <- lab_data4 |>
+    dplyr::filter(dplyr::between(ParalysisOnsetDate, start_date, end_date)) |>
+    dplyr::distinct() |>
+    dplyr::filter(SpecimenNumber %in% c(1, 2)) |>
     dplyr::filter(!is.na(EPID)) |>
-    dplyr::select(-"n")
-
-  lab_data4 <- lab_data4[!duplicated(lab_data4[c("EPID", "SpecimenNumber")]), ]
-  cli::cli_process_done()
-
-  # Create intervals (currently using subset of those I need for SC PPT)
-  cli::cli_process_start("Creating timeliness interval columns")
-  lab_data5 <- lab_data4 |>
+    dplyr::distinct(EPID, SpecimenNumber, .keep_all = TRUE) |>
     dplyr::mutate(
-      # Intervals from stool arrival to sequencing ----
-      ## timeliness of stool collection to arrival in lab ----
       days.collect.lab = DateStoolReceivedinLab - DateStoolCollected,
-
-      ## timeliness of stool arriving in lab to final culture results ----
       days.lab.culture = DateFinalCellCultureResult - DateStoolReceivedinLab,
-
-      ## timeliness of final culture results to arrival at the sequencing lab ----
       days.seq.ship = DateIsolateRcvdForSeq - DateFinalCellCultureResult,
-
-      ## timeliness of arrival at sequencing lab to sequencing results ----
-      days.seq.rec.res = DateofSequencing - DateIsolateRcvdForSeq,,
-
-      # Interval measuring sequencing results from date of arrival (NOT part of KPI) ----
-      ## timeliness of ITD results to arrival at sequencing lab ----
+      days.seq.rec.res = DateofSequencing - DateIsolateRcvdForSeq,
       days.itd.arriveseq = DateIsolateRcvdForSeq - DateFinalrRTPCRResults,
-
-      ## timeliness of ITD results to sequencing results ----
       days.itd.seqres = DateofSequencing - DateFinalrRTPCRResults,
-
-      # Measures overall lab timeliness ----
-      ## timeliness of arriving in lab to sequencing ----
       days.lab.seq = DateofSequencing - DateStoolReceivedinLab,
-
-      # Met target yes/no
       met.targ.collect.lab = ifelse(days.collect.lab < 3, 1, 0),
-      negative.spec = ifelse(!str_detect(FinalCellCultureResult, "ITD") &
-                               FinalITDResult == "NULL", 1, 0),
-      met.lab.culture = ifelse(days.lab.culture < 14, 1, 0),
-    )
-  cli::cli_process_done()
-
-  cli::cli_process_start("Filtering out negative time intervals")
-  lab_data5 <- lab_data5 |>
-    # filtering out negative time intervals
-    dplyr::filter((days.collect.lab >= 0 | is.na(days.collect.lab)) &
-                    (days.lab.culture >= 0 | is.na(days.lab.culture)) &
-                    (days.seq.ship >= 0 | is.na(days.seq.ship)) &
-                    (days.lab.seq >= 0 | is.na(days.lab.seq)) &
-                    (days.itd.seqres >= 0 | is.na(days.itd.seqres)) &
-                    (days.itd.arriveseq >= 0 | is.na(days.itd.arriveseq)) &
-                    (days.seq.rec.res >= 0 | is.na(days.seq.rec.res)))
-  cli::cli_process_done()
-
-  cli::cli_process_start("Filtering nonsensical dates")
-  lab_data5 <- lab_data5 |>
+      negative.spec = ifelse(
+        !stringr::str_detect(FinalCellCultureResult, "ITD") &
+          FinalITDResult == "NULL",
+        1, 0
+      ),
+      met.lab.culture = ifelse(days.lab.culture < 14, 1, 0)
+    ) |>
     dplyr::filter(
-      (DateStoolCollected >= ParalysisOnsetDate | is.na(ParalysisOnsetDate)),
-      # (lubridate::year(DateFinalCellCultureResult) <= 2023 | is.na(DateFinalCellCultureResult)),
-      # remove a blank specimen row
-      !is.na(EPID)
-    ) |>
-    dplyr::mutate(
-      seq.capacity = ifelse(seq.capacity == "yes",
-                            "Sequencing capacity",
-                            "No sequencing capacity"
-      ),
-      culture.itd.lab = ifelse(country == "NIGERIA",
-                               "Nigeria", culture.itd.lab
-      ),
-    ) |>
-    dplyr::select(-dplyr::contains("cIntratypeIs"))
-  cli::cli_process_done()
-
-  lab_data <- lab_data5
-  rm(lab_data2, lab_data3, lab_data4, lab_data5)
-
-  cli::cli_process_start("Correcting district and province names.")
-  lab_data <- impute_missing_lab_geo(lab_data, afp_data)
-  cli::cli_process_done()
-
-  # Filter to only the country of interest
-  if (!is.null(ctry_name)) {
-    ctry_name <- stringr::str_trim(stringr::str_to_upper(ctry_name))
-    # Handle when passing just one string comma delimited string
-    ctry_name <- stringr::str_replace_all(ctry_name, ", ", ",") |>
-      stringr::str_split(",") |>
-      unlist()
-    # Recode for COTE D'IVOIRE
-    ctry_name <- dplyr::if_else(stringr::str_detect(ctry_name, "(?i)IVOIRE"),
-                                "COTE D'IVOIRE", ctry_name
+      (days.collect.lab >= 0 | is.na(days.collect.lab)) &
+        (days.lab.culture >= 0 | is.na(days.lab.culture)) &
+        (days.seq.ship >= 0 | is.na(days.seq.ship)) &
+        (days.lab.seq >= 0 | is.na(days.lab.seq)) &
+        (days.itd.seqres >= 0 | is.na(days.itd.seqres)) &
+        (days.itd.arriveseq >= 0 | is.na(days.itd.arriveseq)) &
+        (days.seq.rec.res >= 0 | is.na(days.seq.rec.res))
     )
-    cli::cli_process_start("Filtering country-specific lab data")
-    cli::cli_alert_warning(paste0(
-      "NOTE: Filtering will include rows where ctry is",
-      " N/A. Please review the dataset carefully after cleaning."
-    ))
-    lab_data <- lab_data |>
-      dplyr::filter(ctry %in% ctry_name | is.na(ctry))
-    cli::cli_process_done()
+
+  # Option B: apply stool/onset filter only if it keeps rows
+  #Use protective logic to avoid accidentally dropping all rows.
+  out_candidate <- out |>
+    dplyr::filter(DateStoolCollected >= ParalysisOnsetDate | is.na(ParalysisOnsetDate))
+
+  if (nrow(out_candidate) > 0) {
+    out <- out_candidate
+  } else {
+    cli::cli_alert_warning(
+      "DateStoolCollected >= ParalysisOnsetDate filter removed all rows; skipping this filter for current dataset."
+    )
   }
 
-  # adding additional subintervals (these aren't present in regional lab data, so are created as dummy variables)
-  lab_data <- lab_data |>
-    mutate(
+  out <- out |>
+    dplyr::mutate(
+      seq.capacity = dplyr::case_when(
+        seq.capacity == "yes" ~ "Sequencing capacity",
+        seq.capacity == "no" ~ "No sequencing capacity",
+        .default = seq.capacity
+      ),
+      culture.itd.lab = dplyr::case_when(
+        country == "NIGERIA" ~ "Nigeria",
+        culture.itd.lab == "NOGUCHI- Ghana" ~ "NOGUCHI-Ghana",
+        .default = culture.itd.lab
+      )
+    )
+
+  #Remove intratype detail columns not needed in cleaned regional output.
+  out <- out |>
+    dplyr::select(-dplyr::contains("cIntratypeIs"))
+
+  #Impute missing geography and apply optional country filter.
+  out <- impute_missing_lab_geo(out, afp_data)
+
+  if (!is.null(ctry_name)) {
+    ctry_name <- normalize_lab_ctry_filter(ctry_name)
+    out <- out |>
+      dplyr::filter(ctry %in% ctry_name | is.na(ctry))
+  }
+
+  #Keep WHO-compatible delay fields present even when unavailable regionally.
+  out |>
+    dplyr::mutate(
       days.coll.sent.field = NA,
       days.sent.field.rec.nat = NA,
       days.rec.nat.sent.lab = NA,
       days.sent.lab.rec.lab = NA,
-      days.rec.lab.culture = NA,
+      days.rec.lab.culture = NA
     )
+}
 
   return(lab_data)
 }
