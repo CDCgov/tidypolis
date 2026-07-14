@@ -588,7 +588,7 @@ clean_lab_data_who <- function(lab_data, start_date, end_date,
   }
 
   #Compute turnaround metrics then filter to case records in range.
-  out <- lab_data |>
+  lab_data <- lab_data |>
     dplyr::mutate(
       days.collect.lab = DateStoolReceivedinLab - DateStoolCollected,
       days.lab.culture = DateFinalCellCultureResults - DateStoolReceivedinLab,
@@ -603,19 +603,19 @@ clean_lab_data_who <- function(lab_data, start_date, end_date,
     )
 
   #Fill geography from AFP linkage and derive WHO region.
-  out <- impute_missing_lab_geo(out, afp_data)
-  out <- out |>
+  lab_data <- impute_missing_lab_geo(lab_data, afp_data)
+  lab_data <- lab_data |>
     dplyr::mutate(whoregion = get_region(ctry))
 
   #Optional country filter (supports comma-delimited text input).
   if (!is.null(ctry_name)) {
     ctry_name <- normalize_lab_ctry_filter(ctry_name)
-    out <- out |>
+    lab_data <- lab_data |>
       dplyr::filter(ctry %in% ctry_name | is.na(ctry))
   }
 
   #Add additional field-to-lab transport timing metrics.
-  out |>
+  lab_data |>
     dplyr::mutate(
       days.coll.sent.field = as.numeric(DateStoolSentfromField - DateStoolCollected),
       days.sent.field.rec.nat = as.numeric(DateStoolReceivedNatLevel - DateStoolSentfromField),
@@ -650,7 +650,7 @@ clean_lab_data_regional <- function(lab_data,
 
   #Standardize columns/dates, normalize country, join routing lookups,
   #then filter to valid specimen records.
-  out <- dplyr::rename_with(lab_data, dplyr::recode, Name = "country") |>
+  lab_data <- dplyr::rename_with(lab_data, dplyr::recode, Name = "country") |>
     dplyr::mutate(
       dplyr::across(dplyr::any_of(c(
         "CaseDate", "ParalysisOnsetDate", "DateStoolCollected", "StoolDateSentToLab",
@@ -711,18 +711,18 @@ clean_lab_data_regional <- function(lab_data,
 
   # Option B: apply stool/onset filter only if it keeps rows
   #Use protective logic to avoid accidentally dropping all rows.
-  out_candidate <- out |>
+  out_candidate <- lab_data |>
     dplyr::filter(DateStoolCollected >= ParalysisOnsetDate | is.na(ParalysisOnsetDate))
 
   if (nrow(out_candidate) > 0) {
-    out <- out_candidate
+    lab_data <- out_candidate
   } else {
     cli::cli_alert_warning(
       "DateStoolCollected >= ParalysisOnsetDate filter removed all rows; skipping this filter for current dataset."
     )
   }
 
-  out <- out |>
+  lab_data <- lab_data |>
     dplyr::mutate(
       seq.capacity = dplyr::case_when(
         seq.capacity == "yes" ~ "Sequencing capacity",
@@ -737,20 +737,20 @@ clean_lab_data_regional <- function(lab_data,
     )
 
   #Remove intratype detail columns not needed in cleaned regional output.
-  out <- out |>
+  lab_data <- lab_data |>
     dplyr::select(-dplyr::contains("cIntratypeIs"))
 
   #Impute missing geography and apply optional country filter.
-  out <- impute_missing_lab_geo(out, afp_data)
+  lab_data <- impute_missing_lab_geo(lab_data, afp_data)
 
   if (!is.null(ctry_name)) {
     ctry_name <- normalize_lab_ctry_filter(ctry_name)
-    out <- out |>
+    lab_data <- lab_data |>
       dplyr::filter(ctry %in% ctry_name | is.na(ctry))
   }
 
   #Keep WHO-compatible delay fields present even when unavailable regionally.
-  out |>
+  lab_data |>
     dplyr::mutate(
       days.coll.sent.field = NA,
       days.sent.field.rec.nat = NA,
@@ -761,7 +761,7 @@ clean_lab_data_regional <- function(lab_data,
 }
 
   return(lab_data)
-}
+
 
 # Public Functions ----
 
@@ -976,7 +976,7 @@ clean_lab_data <- function(lab_data, start_date, end_date,
   # .rda output
   #Optional side-effect to save cleaned output object.
   if (!is.null(save_rda_path)) {
-    lab_clean_all <- out
+    lab_clean_all <- lab_data
     save(lab_clean_all, file = save_rda_path)
   }
 
