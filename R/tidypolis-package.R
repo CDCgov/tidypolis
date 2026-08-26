@@ -107,5 +107,16 @@ utils::globalVariables(c(
   "no.of.shapes", "report_date", "DosesOPVNumber", "geo.corrected", "wrongAdmin0GUID",
   "Admin 0 Id", "Admin 1 Id", "Admin 2 Id", "WHO Region", "WHORegion", "X",
   "cluster", "datasource", "epid_fixed", "file_name", "value", "old", "new",
-  "y"
+  "y",
+  "CaseDate", "Name",  "n_rows_combo", "max_lab_date",
+  "DateStoolCollected", "ParalysisOnsetDate", "StoolDateSentToLab",
+  "DateStoolReceivedinLab", "DateFinalCellCultureResult",
+  "DateIsolateRcvdForSeq", "DateofSequencing", "SpecimenNumber",
+  "DateFinalrRTPCRResults", "FinalCellCultureResult", "FinalITDResult",
+  "days.collect.lab", "days.lab.culture", "days.seq.ship", "days.lab.seq",
+  "days.itd.seqres", "days.itd.arriveseq", "days.seq.rec.res",
+  "EpidNumber", "prov", "dist", "epid_ctry", "epid_comb", "ctry.x", "ctry.y",
+  "adm0guid.x", "adm0guid.y", "epid_prov", "prov.x", "prov.y", "adm1guid.x",
+  "adm1guid.y", "epid_dist", "dist.x", "dist.y", "adm2guid.x", "adm2guid.y",
+  "seq.capacity", "wgs.lab", "seq.lab", "culture.itd.lab", "seq.cat"
 ))

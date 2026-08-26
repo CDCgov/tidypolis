@@ -394,8 +394,8 @@ load_lab_data <- function(lab_data_path, sheet_name = NULL) {
 #'
 #' Main lab data preparation function.
 #' Requires Excel files from WHO saved to a local file path.
-#' Expects the names of Excel files to contain the pattern "[Region] Lab Extract"
-#' and the Sheets within the Excel files to contain the pattern "[Region] Lab data"
+#' Expects the names of Excel files to contain the pattern `[Region] Lab Extract`
+#' and the Sheets within the Excel files to contain the pattern `[Region] Lab data`
 #'
 #' uploads to EDAV if use_edav = TRUE, otherwise, returns the lab data frame as an output that can be written as a CSV file to a local directory
 #'
@@ -481,14 +481,14 @@ prep_lab_data <- function(lab_data_path,
 
       if (any(is.na(file_dates))) {
         warning("Multiple files found for region ", region,
-                " but not all filenames contain a valid YYYY-MM-DD date — using the first: ",
+                " but not all filenames contain a valid YYYY-MM-DD date - using the first: ",
                 basename(matched_files[1]))
         f <- matched_files[1]
       } else {
         # get the date of the latest file to check for cases with future dates entered in the system
         file_date <- file_dates[which.max(file_dates)]
         f <- matched_files[which.max(file_dates)]
-        warning("Multiple files found for region ", region, " — using the most recent: ", basename(f))
+        warning("Multiple files found for region ", region, " - using the most recent: ", basename(f))
       }
     } else {
       # even if only one file, still need the date of the file to compare against the date values
@@ -908,8 +908,8 @@ prep_lab_data <- function(lab_data_path,
   lab_data3 <- lab_data2 |>
     # rename columns for merging
     dplyr::rename(
-      country=Name,
-      EPID=EpidNumber
+      country = Name,
+      EPID = EpidNumber
     ) |>
     dplyr::left_join(
       lab_locs |> dplyr::select("country":"num.ship.seq.samples")
@@ -918,7 +918,7 @@ prep_lab_data <- function(lab_data_path,
     dplyr::mutate(seq.capacity = dplyr::if_else(seq.capacity == "yes",
                                                 "Sequencing capacity",
                                                 "No sequencing capacity"),
-                  #list of labs that sent samples to CDC for sequencing prior to February 2025, Nigeria and Uganda started doing their own sequencing.
+                  #list of culture labs that sent samples to CDC for sequencing prior to February 2025, Nigeria and Uganda started doing their own sequencing.
                   #Adding in redundancy for Nigeria in case lab locs file gets changed
                   seq.lab = dplyr::case_when(
                     # labs that previously shipped to Atlanta for sequencing
