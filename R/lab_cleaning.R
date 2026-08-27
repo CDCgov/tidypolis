@@ -291,105 +291,6 @@ parse_lab_date <- function(x) {
 }
 
 # Public functions ----
-#' Table of information regarding testing labs in each country
-#'
-#' Imports information on testing labs for each country, either from a CSV file
-#' or downloaded from EDAV. If no argument is passed, the function will download
-#' the table from EDAV.
-#'
-#' @inheritParams prep_lab_data
-#'
-#' @returns `tibble` A table containing the test lab location information.
-#' @examples
-#' \dontrun{
-#' ctry.seq <- get_lab_locs()
-#' }
-#'
-#' @export
-
-get_lab_locs <- function(lab_locs_path = NULL, use_edav = TRUE) {
-  lab.locs <- NULL
-  if (is.null(lab_locs_path) & use_edav) {
-    tryCatch(
-      {
-        cli::cli_process_start("Downloading lab testing location file from EDAV.")
-        lab.locs <- sirfunctions::edav_io("read", file_loc = "Data/lab/Routine_lab_testing_locations.csv")
-        cli::cli_process_done()
-      },
-      error = function(e) {
-        stop(paste0(
-          "Download of lab testing location file from EDAV failed.",
-          "Please specify the path to the Routine lab testing location file ",
-          "and try again."
-        ))
-      }
-    )
-  } else if (!is.null(lab_locs_path)) {
-    lab.locs <- readr::read_csv(lab_locs_path)
-  } else {
-    cli::cli_abort("Please pass the path to the lab locations file in `lab_locs_path`.")
-  }
-
-  lab.locs <- lab.locs |>
-    dplyr::mutate(country = stringr::str_to_upper(country))
-
-  # Manual corrections
-  lab.locs.edited <- lab.locs |>
-    dplyr::filter(!is.na(country)) |>
-    dplyr::mutate(seq.capacity = stringr::str_to_lower(seq.capacity)) |>
-    dplyr::mutate(`wgs.lab` = stringr::str_replace_all(`wgs.lab`, "- ", "-"),
-                  seq.lab = stringr::str_replace_all(seq.lab, "- ", "-"),
-                  culture.itd.lab = stringr::str_replace_all(culture.itd.lab, "- ", "-")) |>
-    dplyr::mutate(`wgs.lab` = dplyr::case_when(
-      country == "OCCUPIED PALESTINIAN TERRITORY, INCLUDING EAST JERUSALEM" ~ "Unknown",
-      `wgs.lab` %in% c("-", NA) ~ "Unknown",
-      .default = `wgs.lab`)) |>
-    dplyr::mutate(culture.itd.lab = dplyr::case_when(
-      country == "OCCUPIED PALESTINIAN TERRITORY, INCLUDING EAST JERUSALEM" ~ "Jordan",
-      culture.itd.lab %in% c("-", NA) ~ "Unknown",
-      .default = culture.itd.lab
-    )) |>
-    dplyr::mutate(seq.lab = dplyr::case_when(
-      country == "OCCUPIED PALESTINIAN TERRITORY, INCLUDING EAST JERUSALEM" ~ "Jordan",
-      seq.lab %in% c("-", NA) ~ "Unknown",
-      .default = seq.lab
-    ))
-
-
-  return(lab.locs.edited)
-}
-
-#' Function to load the raw lab data locally
-#'
-#' This a function to load lab data that are either CSVs or Excel files.
-#'
-#' @param lab_data_path `str` File path as a string to the lab data.
-#' @param sheet_name `str` Name of the sheet to load. This is optional in cases
-#' of an Excel sheet with multiple tabs.
-#'
-#' @returns `tibble` Lab data loaded from the CSV or Excel file path.
-#' @examples
-#' \dontrun{
-#' lab_data_path <- "C:/Users/ABC1/Desktop/lab_data.csv"
-#' lab_data <- load_lab_data(lab_data_path)
-#' }
-#'
-#' @export
-load_lab_data <- function(lab_data_path, sheet_name = NULL) {
-  if (!requireNamespace("readxl", quietly = TRUE)) {
-    stop('Package "readxl" must be installed to use this function.',
-         .call = FALSE
-    )
-  }
-
-  if (stringr::str_ends(lab_data_path, ".csv")) {
-    return(readr::read_csv(lab_data_path))
-  } else if (stringr::str_ends(lab_data_path, ".xlsx")) {
-    return(readxl::read_excel(lab_data_path, sheet = sheet_name))
-  } else {
-    stop("Not a csv or .xlsx file. Try again.")
-  }
-}
 #' Prep lab data
 #'
 #' Main lab data preparation function.
@@ -514,7 +415,7 @@ prep_lab_data <- function(lab_data_path,
       file_date=Sys.Date()
     }
     # load in the data from the sheet for this region
-    df <- load_lab_data(f, sheet_name = sheet_name) |>
+    df <- sirfunctions::load_lab_data(f, sheet_name = sheet_name) |>
       dplyr::mutate(source_file = basename(f), whoregion = region, download_date=file_date)
 
     # convert any column with "date" in its name to Date type using the robust data parser function
@@ -903,7 +804,7 @@ prep_lab_data <- function(lab_data_path,
 
 
   # add lab locs
-  lab_locs <- get_lab_locs(lab_locs_path, use_edav)
+  lab_locs <- sirfunctions::get_lab_locs(lab_locs_path, use_edav)
 
   lab_data3 <- lab_data2 |>
     # rename columns for merging
@@ -941,8 +842,8 @@ prep_lab_data <- function(lab_data_path,
   # If save_to_edav is TRUE save to EDAV, otherwise return the data frame as an output of the function
 
   if (save_to_edav) {
-    #COMMENTED OUT FOR NOW TO AVOID DISASTER
-    #tidypolis_io(obj = lab_data3, io = "write", file_path = "Data/lab/cleaned_lab_data.rda")
+    # COMMENTED OUT FOR NOW TO AVOID DISASTER
+    # tidypolis_io(obj = lab_data3, io = "write", file_path = "Data/lab/cleaned_lab_data.rda")
   }
   else {
     cli::cli_alert_info("save_to_edav=FALSE, returning lab data as output object")
