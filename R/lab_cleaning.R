@@ -659,8 +659,33 @@ prep_lab_data <- function(lab_data_path,
     )
   cli::cli_process_done()
 
+  # Standardize NULL values
+  # Desired convention:
+  # - FinalITDResult: "NULL" -> blank string ""
 
+  if ("FinalITDResult" %in% names(lab_data)) {
+    lab_data <- lab_data |>
+      dplyr::mutate(
+        FinalITDResult = {
+          x <- as.character(FinalITDResult)
+          x <- trimws(x)
+          x[!is.na(x) & x %in% c("NULL", "null")] <- ""
+          x
+        }
+      )
+  }
 
+  if ("FinalCellCultureResult" %in% names(lab_data)) {
+    lab_data <- lab_data |>
+      dplyr::mutate(
+        FinalCellCultureResult = {
+          x <- as.character(FinalITDResult)
+          x <- trimws(x)
+          x[!is.na(x) & x %in% c("NULL", "null")] <- ""
+          x
+        }
+      )
+  }
   # 3.2 steps from clean_lab_data_regional() ----
 
   # drop EPID/Specimen number duplicates - look for the row with the most complete information
