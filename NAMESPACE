@@ -14,6 +14,7 @@ export(get_table_ids)
 export(get_table_size)
 export(init_tidypolis)
 export(log_report)
+export(prep_lab_data)
 export(preprocess_data)
 export(process_spatial)
 export(run_diagnostics)
@@ -29,50 +30,72 @@ import(dplyr)
 import(lubridate)
 import(sf)
 import(stringr)
-importFrom(arrow,open_dataset)
-importFrom(arrow,read_parquet)
+importFrom(arrow,
+  open_dataset,
+  read_parquet
+)
 importFrom(cluster,clusGap)
 importFrom(doFuture,registerDoFuture)
-importFrom(foreach,"%dopar%")
-importFrom(foreach,foreach)
+importFrom(foreach,
+  "%dopar%",
+  foreach
+)
 importFrom(future,plan)
-importFrom(httr,GET)
-importFrom(httr,RETRY)
-importFrom(httr,add_headers)
-importFrom(httr,content)
-importFrom(httr,set_config)
-importFrom(httr,status_code)
+importFrom(httr,
+  GET,
+  RETRY,
+  add_headers,
+  content,
+  set_config,
+  status_code
+)
 importFrom(jsonlite,fromJSON)
 importFrom(lifecycle,deprecated)
-importFrom(progressr,handlers)
-importFrom(progressr,progressor)
-importFrom(progressr,with_progress)
-importFrom(purrr,map_df)
-importFrom(purrr,walk)
-importFrom(readr,col_character)
-importFrom(readr,cols)
-importFrom(readr,read_csv)
-importFrom(readr,read_delim)
-importFrom(readr,read_rds)
-importFrom(readr,write_csv)
-importFrom(readr,write_rds)
-importFrom(sirfunctions,edav_io)
-importFrom(sirfunctions,get_azure_storage_connection)
-importFrom(sirfunctions,load_clean_ctry_sp)
-importFrom(sirfunctions,load_clean_dist_sp)
-importFrom(sirfunctions,load_clean_prov_sp)
-importFrom(sirfunctions,send_teams_message)
+importFrom(progressr,
+  handlers,
+  progressor,
+  with_progress
+)
+importFrom(purrr,
+  map_df,
+  walk
+)
+importFrom(readr,
+  col_character,
+  cols,
+  read_csv,
+  read_delim,
+  read_rds,
+  write_csv,
+  write_rds
+)
+importFrom(sirfunctions,
+  edav_io,
+  get_azure_storage_connection,
+  load_clean_ctry_sp,
+  load_clean_dist_sp,
+  load_clean_prov_sp,
+  send_teams_message
+)
 importFrom(skimr,skim)
-importFrom(stats,kmeans)
-importFrom(stats,rpois)
-importFrom(tidyr,pivot_longer)
-importFrom(tidyr,pivot_wider)
-importFrom(tidyr,replace_na)
-importFrom(tidyr,separate_rows)
-importFrom(tidyr,uncount)
+importFrom(stats,
+  kmeans,
+  rpois
+)
+importFrom(tidyr,
+  pivot_longer,
+  pivot_wider,
+  replace_na,
+  separate_rows,
+  uncount
+)
 importFrom(tools,file_path_sans_ext)
-importFrom(utils,capture.output)
-importFrom(utils,globalVariables)
-importFrom(utils,unzip)
-importFrom(yaml,read_yaml)
-importFrom(yaml,write_yaml)
+importFrom(utils,
+  capture.output,
+  globalVariables,
+  unzip
+)
+importFrom(yaml,
+  read_yaml,
+  write_yaml
+)
