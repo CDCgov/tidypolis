@@ -713,7 +713,7 @@ prep_lab_data <- function(lab_data_path,
     dplyr::distinct() |>
     dplyr::arrange(EPID, SpecimenNumber) |>
     # # NEW: keep the row with the most complete dates
-    # dplyr::mutate(missing_dates = rowSums(is.na(dplyr::across(dplyr::all_of(lab_date_cols))))) |>
+    dplyr::mutate(missing_dates = rowSums(is.na(dplyr::across(dplyr::all_of(lab_date_cols))))) |>
     # # NEW: keep the row with the most recent dates
     # dplyr::rowwise() |>
     # dplyr::mutate(max_lab_date = max(dplyr::c_across(dplyr::all_of(lab_date_cols)), na.rm = TRUE)) |>
@@ -723,8 +723,8 @@ prep_lab_data <- function(lab_data_path,
 
 
   lab_data_distinct <- lab_data_distinct |>
-    # sort within EPID and Specimen number to get the latest date
-    dplyr::arrange(EPID, SpecimenNumber, desc(max_lab_date))
+    # sort within EPID and Specimen number to get the latest date. if multiple rows with the same max date, use the one with the fewest missing dates
+    dplyr::arrange(EPID, SpecimenNumber, desc(max_lab_date), missing_dates)
 
   # now this is sorted so it chooses the top case with the least number of missing dates (change from how previous clean_lab_data() function worked)
   lab_data2 <- lab_data_distinct[!duplicated(lab_data_distinct[c("EPID", "SpecimenNumber")]), ]
