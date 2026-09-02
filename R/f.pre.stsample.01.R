@@ -89,6 +89,10 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
   cli::cli_process_done()
 
+  # dedupe df04_new in case there is overlapping shapes #
+  df04_new <- df04_new |>
+    dplyr::distinct(epid, .keep_all = T)
+
   # df04 has a lot of dupes due to overlapping shapes, need to appropriately de dupe
   # identify duplicate obs
   dupes <- df04 |>
