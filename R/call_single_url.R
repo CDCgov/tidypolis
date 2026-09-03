@@ -64,6 +64,34 @@ call_single_url <- function(url,
     }
   }
 
+  value <- clean_url(value)
+
   return(value)
 
+}
+
+clean_url <- function(df) {
+
+  # Convert "NULL" and "" to NA for all character columns
+  df <- dplyr::mutate(
+    df,
+    dplyr::across(
+      dplyr::where(is.character),
+      ~ dplyr::na_if(dplyr::na_if(.x, "NULL"), "")
+    )
+  )
+  
+  # For specific columns, convert to appropriate types
+  # column names are hardcoded
+  if ("date_onset" %in% names(df)) {
+    df$date_onset <- as.Date(df$date_onset, format = "%Y-%m-%d")
+  }
+  if ("age_months" %in% names(df)) {
+    df$age_months <- as.numeric(df$age_months)
+  }
+  if ("vaccinated" %in% names(df)) {
+    df$vaccinated <- as.logical(df$vaccinated)
+  }
+  
+  return(df)
 }
