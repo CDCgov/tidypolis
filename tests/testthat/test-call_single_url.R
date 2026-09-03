@@ -7,7 +7,7 @@ test_that("Testing the call_single_url() function", {
         {"epid": "PAK-2024-002", "name": "Phillip Khan", "date_onset": "", "age_months": "24", "vaccinated": "FALSE"},
         {"epid": "PAK-2024-003", "name": "Felipe Torres", "date_onset": "2024-01-15", "age_months": "NULL", "vaccinated": "TRUE"}
       ]}'
-      list(content = charToRaw(mock_json))
+      list(status_code = 200, content = charToRaw(mock_json))
     },
     .package = "httr"
   )
@@ -53,7 +53,7 @@ test_that("Testing the call_single_url() function", {
         )
       })
       mock_json <- jsonlite::toJSON(list(value = mock_data), auto_unbox = TRUE)
-      list(content = charToRaw(mock_json))
+      list(status_code = 200, content = charToRaw(mock_json))
     },
     .package = "httr"
   )
@@ -87,7 +87,7 @@ test_that("Testing the call_single_url() function", {
         )
       })
       mock_json <- jsonlite::toJSON(list(value = mock_data), auto_unbox = TRUE)
-      list(content = charToRaw(mock_json))
+      list(status_code = 200, content = charToRaw(mock_json))
     },
     .package = "httr"
   )
