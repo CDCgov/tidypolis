@@ -2741,6 +2741,53 @@ s1_clean_case_table <- function(path, crosswalk,
   api_case_sub3 <- remove_empty_columns(api_case_sub3)
   cli::cli_process_done()
 
+  cli::cli_process_start("Checking for Contact epids classified as AFP")
+
+  afp_contacts_count<- api_case_sub3 |>
+    dplyr::mutate(
+      Year = lubridate::year(as.Date(.data[["Case Date"]])),
+      EPID = as.character(EPID),
+      Stool2_chr = trimws(as.character(.data[["Stool 2 Collection Date"]]))
+    ) |>
+    dplyr::filter(
+      .data[["Surveillance Type"]] == "AFP",
+      stringr::str_detect(
+        EPID,
+        stringr::regex("(HC\\d+|CC\\d+|C\\d+)$", ignore_case = TRUE)
+      ),
+      is.na(.data[["Stool 2 Collection Date"]]) | Stool2_chr == "",
+      !is.na(.data[["Paralysis Onset Date"]])
+    ) |>
+    dplyr::select(
+      `Place Admin 0`,
+      Year,
+      EPID,
+      `Surveillance Type`,
+      `Case Date`,
+      `Stool 1 Collection Date`,
+      `Stool 2 Collection Date`
+    ) |>
+    dplyr::arrange(`Place Admin 0`, Year, EPID)
+
+  if (nrow(afp_contacts_count) > 0) {
+    invisible(capture.output(
+      tidypolis_io(
+        io = "write",
+        file_path = paste0(
+          polis_data_folder, "/", output_folder_name,
+          "/afp_contacts_count.csv"
+        ),
+        obj = afp_contacts_count |>
+          dplyr::select(
+            `Place Admin 0`, EPID, `Date of Onset`,
+            `Stool 1 Collection Date`, `Stool 2 Collection Date`
+          )
+      )
+    ))
+  } else {
+    cli::cli_alert_success("AFP check: No matches found.")
+  }
+
   return(api_case_sub3)
 }
 
