@@ -832,14 +832,28 @@ create_response_vars <- function(pos,
   # bring in processed SIA data
   path <- tidypolis_io(io = "list", file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"), output_folder_name), full_names = T)
 
+
   tryCatch(
     {
       sia <- tidypolis_io(io = "read", file_path = path[grepl("sia_2000", path)])
     },
     error = \(e) {
-      cli::cli_abort("Please run Step 3 of preprocessing before Step 5.")
+      cli::cli_warn("sia_2000 missing...continuing.")
+
     }
   )
+
+  # If no SIA data, return pos unchanged with NA response variables
+  if (is.null(sia)) {
+    cli::cli_warn("No SIA file found.")
+    pos_with_nas <- pos |>
+      dplyr::mutate(
+        finished.responses = NA_real_,
+        planned.campaigns = NA_real_,
+        ipv.campaigns = NA_real_
+      )
+    return(pos_with_nas)
+  }
 
   sia.sub <- sia |>
     dplyr::select(
@@ -1275,9 +1289,10 @@ preprocess_cdc <- function(polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
     for (file in missing_static_files) {
       cli::cli_alert_info(paste0(file, "\n"))
     }
-    cli::cli_abort("Halting execution of preprocessing due to missing files.")
+    cli::cli_alert_warning("Continuing execution of preprocessing with missing files.")
   }
   rm(core_files_folder_path, missing_static_files)
+
 
   # Step 1 - Basic cleaning and crosswalk ======
   cli::cli_h1("Step 1/5: Basic cleaning and crosswalk across datasets")
@@ -7936,6 +7951,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
     dplyr::filter(grepl(paste0("^(afp_linelist_2001-01-01).*(\\", output_format, ")$"), short_name)) |>
     dplyr::pull(name)
 
+
   tryCatch(
     {
       afp.01 <- lapply(afp.files.01, function(x) tidypolis_io(io = "read", file_path = x)) |>
@@ -7945,10 +7961,9 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
         dplyr::filter(dplyr::between(yronset, startyr, endyr))
     },
     error = \(e) {
-      cli::cli_abort("Please run Step 2 of preprocessing before Step 5.")
-    }
-  )
-
+      cli::cli_warn("Missing other_surveillance_type_linelist_2016...continuing.")
+     }
+    )
 
   non.afp.files.01 <- dplyr::tibble("name" = tidypolis_io(io = "list", file_path = file.path(polis_data_folder, output_folder_name), full_names = T)) |>
     dplyr::mutate(short_name = stringr::str_replace(name, paste0(polis_data_folder, "/", output_folder_name, "/"), "")) |>
@@ -7958,7 +7973,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
     ), short_name)) |>
     dplyr::pull(name)
 
-
+  non.afp.01 <- NULL
   if (output_folder_name == "Core_Ready_Files" ||
     length(non.afp.files.01) > 0) {
     tryCatch(
@@ -7972,7 +7987,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
           dplyr::filter(dplyr::between(yronset, startyr, endyr))
       },
       error = \(e) {
-        cli::cli_abort("Please run Step 2 of preprocessing before Step 5.")
+        cli::cli_warn("Non-AFP surveillance files found but could not be read")
       }
     )
   } else {
