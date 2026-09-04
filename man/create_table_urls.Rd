@@ -15,7 +15,7 @@ create_table_urls(api_url, table_data, days_intervals = 7)
 the request will not be chunked.}
 }
 \value{
-\code{str} Array of URLs to be used in \code{\link[=call_urls]{call_urls()}}.
+\code{str} Array of URLs to be used in \code{\link[=call_urls_in_parallel]{call_urls_in_parallel()}}.
 }
 \description{
 Create URLs for a table to assist in parallelization. Each table will need to be

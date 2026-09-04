@@ -12,12 +12,9 @@ run_single_table_diagnostic <- function(.table, key = Sys.getenv("POLIS_API_Key"
     table_data <- get_polis_cache(.table = .table)
     table_url <- paste0(base_url, table_data$endpoint)
 
-    # disable SSL Mode
-    httr::set_config(httr::config(ssl_verifypeer = 0L))
-
     tick <- Sys.time()
     data_return <- tryCatch(
-      call_single_url(paste0(table_url, "?$top=1000"), key, times = 1),
+      call_urls_in_parallel(paste0(table_url, "?$top=1000"), key),
       error = function(cond) {
         return("Error")
       }
@@ -29,7 +26,7 @@ run_single_table_diagnostic <- function(.table, key = Sys.getenv("POLIS_API_Key"
     tick <- Sys.time()
     id_url <- paste0(table_url, "?$select=", table_data$polis_id, "&$top=1000")
     id_return <- tryCatch(
-      call_single_url(id_url, key, times = 1),
+      call_urls_in_parallel(id_url, key),
       error = function(cond) {
         return("Error")
       }
@@ -46,4 +43,4 @@ run_single_table_diagnostic <- function(.table, key = Sys.getenv("POLIS_API_Key"
         "id_time" = id_time
       )
     )
-  }
+}
