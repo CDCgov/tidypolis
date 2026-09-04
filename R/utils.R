@@ -1520,6 +1520,15 @@ process_spatial <- function(gdb_folder,
   }
   cli::cli_process_done()
 
+  cli::cli_process_start("Validating geometries")
+
+  #Make geometries valid
+  global.ctry.01 <- sf::st_make_valid(global.ctry.01)
+  global.prov.01 <- sf::st_make_valid(global.prov.01)
+  global.dist.01 <- sf::st_make_valid(global.dist.01)
+
+  cli::cli_process_done()
+
   # identify sf var in global.ctry
   cli::cli_process_start("Country shapefile processing")
   sf_columns_ctry <- sapply(global.ctry.01, function(col) inherits(col, "sfc"))
