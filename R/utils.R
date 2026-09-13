@@ -8043,7 +8043,11 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
   afp.01 <- afp.01[!duplicated(afp.01$epid), ] |>
     dplyr::select(
       epid, dateonset, place.admin.0, place.admin.1, place.admin.2, admin0guid, yronset, admin1guid, admin2guid, cdc.classification.all,
-      whoregion, nt.changes, emergence.group, virus.cluster, surveillancetypename, lat, lon, vtype.fixed, datenotificationtohq
+      whoregion, nt.changes, emergence.group, virus.cluster, surveillancetypename, lat, lon, vtype.fixed, datenotificationtohq,
+      sitepi_admin1_name,
+      sitepi_admin1_guid,
+      sitepi_admin2_name,
+      sitepi_admin2_guid
     )
 
   if (length(non.afp.files.01) > 0) {
@@ -8058,7 +8062,11 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
 
   # Combine AFP and other surveillance type cases
   afp.02 <- dplyr::bind_rows(afp.01, non.afp.01) |>
-    dplyr::select(epid, lat, lon, datenotificationtohq) |>
+    dplyr::select(epid, lat, lon, datenotificationtohq,
+                  sitepi_admin1_name,
+                  sitepi_admin1_guid,
+                  sitepi_admin2_name,
+                  sitepi_admin2_guid) |>
     dplyr::mutate(datenotificationtohq = parse_date_time(datenotificationtohq, c("%Y-%m-%d", "%d/%m/%Y")))
 
 
