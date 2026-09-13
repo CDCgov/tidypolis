@@ -323,10 +323,10 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
       "wrongAdmin0GUID", "wrongAdmin1GUID", "wrongAdmin2GUID", "ADM1_GUID", "ADM0_GUID", "ADM0_NAME",
       "ADM1_NAME", "ADM2_NAME"
     ))) |>
-    dplyr::mutate(geo.corrected = dplyr::if_else(is.na(geo.corrected), 0, geo.corrected))
+    dplyr::mutate(geo.corrected = dplyr::if_else(is.na(geo.corrected), 0, geo.corrected)) -> df09
 
   # Add values in sitepi_* variables if name and GUID changed in the most recent shape file, otherwise NA
-  df09 <- df09 |>
+  df10 <- df09 |>
     dplyr::left_join(df04_new, by = "epid") |>
     dplyr::mutate(
         sitepi_admin1_guid = dplyr::if_else(new_admin1_guid != Admin1GUID, new_admin1_guid, NA),
@@ -335,7 +335,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
         sitepi_admin2_name = dplyr::if_else(new_admin2_name != place.admin.2, new_admin2_name, NA)
       )
 
-  final.guid.check <- df09 |>
+  final.guid.check <- df10 |>
     dplyr::filter((paste0("{", stringr::str_to_upper(admin2guid), "}", sep = "") != Admin2GUID |
                      paste0("{", stringr::str_to_upper(admin1guid), "}", sep = "") != Admin1GUID |
                      paste0("{", stringr::str_to_upper(admin0guid), "}", sep = "") != Admin0GUID) &
@@ -343,7 +343,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
     dplyr::select(epid, yronset, place.admin.0, place.admin.1, place.admin.2, admin0guid, admin1guid, admin2guid, Admin0GUID, Admin1GUID, Admin2GUID, geo.corrected)
 
 
-  final.names.check <- df09 |>
+  final.names.check <- df10 |>
     dplyr::select(epid, yronset, place.admin.0, place.admin.1, place.admin.2, admin0guid, admin1guid, admin2guid, Admin0GUID, Admin1GUID, Admin2GUID, geo.corrected) |>
     dplyr::filter((is.na(place.admin.0) & !is.na(admin0guid)) |
                     (is.na(place.admin.1) & !is.na(admin1guid)) |
@@ -356,5 +356,5 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
     rm(final.names.check, final.guid.check)
   }
 
-  return(df09)
+  return(df10)
 }
