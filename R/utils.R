@@ -4683,9 +4683,9 @@ s2_fix_admin_guids <- function(data, shape_data) {
   # Format GUIDs with proper brackets
   data_with_guids <- data |>
     dplyr::mutate(
-      Admin2GUID = paste0("{", toupper(admin2guid), "}"),
-      Admin1GUID = paste0("{", toupper(admin1guid), "}"),
-      Admin0GUID = paste0("{", toupper(admin0guid), "}")
+      Admin2GUID = if_else(!is.na(admin2guid), paste0("{", toupper(admin2guid), "}"),NA),
+      Admin1GUID = if_else(!is.na(admin1guid), paste0("{", toupper(admin1guid), "}"),NA),
+      Admin0GUID = if_else(!is.na(admin0guid), paste0("{", toupper(admin0guid), "}"),NA)
     )
 
   # Extract country level data
@@ -5211,25 +5211,11 @@ s2_create_afp_variables <- function(data) {
         need60day == 1 & timeto60day >= 60 & timeto60day <= 90 ~ 1,
         (need60day == 1 & timeto60day < 60 | timeto60day > 90 |
           is.na(timeto60day) == TRUE) ~ 0
-      ),
+      )) |>
+    dplyr::rename(adm0guid = Admin0GUID,
+                  adm1guid = Admin1GUID,
+                  adm2guid = Admin2GUID) |>
 
-      # Format GUID strings
-      adm0guid = paste("{",
-        stringr::str_to_upper(admin0guid), "}",
-        sep = ""
-      ),
-      adm0guid = dplyr::if_else(
-        adm0guid == "{}" | adm0guid == "{NA}", NA, adm0guid
-      ),
-      adm1guid = paste("{", stringr::str_to_upper(admin1guid), "}", sep = ""),
-      adm1guid = dplyr::if_else(
-        adm1guid == "{}" | adm1guid == "{NA}", NA, adm1guid
-      ),
-      adm2guid = paste("{", stringr::str_to_upper(admin2guid), "}", sep = ""),
-      adm2guid = dplyr::if_else(
-        adm2guid == "{}" | adm2guid == "{NA}", NA, adm2guid
-      )
-    ) |>
     # Rename variables for consistency with existing naming conventions
     dplyr::rename_with(recode,
       stool.adequacy = "adequate.stool",
@@ -5238,8 +5224,7 @@ s2_create_afp_variables <- function(data) {
       `virus.cluster(s)` = "virus.cluster",
       `emergence.group(s)` = "emergence.group"
     ) |>
-    dplyr::filter(!is.na(epid)) |>
-    dplyr::select(-dplyr::any_of(c("Admin2GUID", "Admin1GUID", "Admin0GUID")))
+    dplyr::filter(!is.na(epid))
 
   cli::cli_process_done()
 
@@ -5362,7 +5347,6 @@ s2_export_afp_outputs <- function(data, latest_archive, polis_data_folder,
     )
   ))
 
-
   # Export spatial data
   afp_latlong <- data |>
     dplyr::ungroup() |>
@@ -5405,6 +5389,8 @@ s2_export_afp_outputs <- function(data, latest_archive, polis_data_folder,
   )) |>
     dplyr::filter(grepl("^.*(afp_linelist).*(.rds)$", name)) |>
     dplyr::pull(name)
+
+
 
   # Combine AFP files
   if (length(afp_files_combine) > 0) {
