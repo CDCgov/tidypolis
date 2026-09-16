@@ -34,7 +34,8 @@ Imports:
     utils,
     lifecycle,
     tools,
-    arrow
+    arrow,
+    httr2
 Suggests:
     httpuv,
     fs,

@@ -96,7 +96,7 @@ week_cuts_api <- function(anchor_date, update_col, days_intervals = NULL) {
 #' @details
 #' Valid values for `.table` can be found by looking at the cache via [get_polis_cache()].
 #'
-#' @returns `str` Array of URLs to be used in [call_urls()].
+#' @returns `str` Array of URLs to be used in [call_urls_in_parallel()].
 #' @keywords internal
 create_table_urls <- function(api_url, table_data, days_intervals = 7) {
 

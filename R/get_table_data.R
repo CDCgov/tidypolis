@@ -205,7 +205,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
       urls <- create_table_urls(table_url, table_data, days_interval)
 
       cli::cli_process_start("Downloading data")
-      out <- call_urls(urls)
+      out <- call_urls_in_parallel(urls)
       out_n <- nrow(out)
 
       update_polis_log(
@@ -225,9 +225,9 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     }
 
-    # check ids and make list of ids to be deleted
+    # Check IDs and make list of ids to be deleted
     cli::cli_process_start("Getting table IDs to check for deleted IDs")
-    ids <- get_table_ids(table_data, parallel_calls = FALSE)
+    ids <- get_table_ids(table_data, parallel_calls = parallel_calls)
     cli::cli_process_done()
 
     # Get full size of the table and the table IDs
@@ -236,14 +236,32 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
     # Compare numbers of downloaded ids and
     # full table size to ensure all ids downloaded
     diff <- length(ids) - full_table_size
-
-    if (diff != 0) {
+  
+    # Force the download of the ids again to make sure they match with the full table size
+    # Ensures that we don't inadvertently delete IDs that didn't come through because something
+    # in get_table_ids() failed.
+    id_download_attempt <- 0
+    while (diff != 0) {
       cli::cli_alert_warning(paste0("Table size and downloaded ids are not of the same length.",
-                                    " You may need to re-run the download for this table."))
-    } else {
-      cli::cli_alert_success("Number of downloaded IDs equals the number of expected table records.")
-    }
+      " Redownloading table IDs again..."))
+      id_download_attempt <- id_download_attempt + 1
+      cli::cli_alert_info(paste0("No. of attempts to download IDs again: ", id_download_attempt))
+      
+      # Check ids and make list of ids to be deleted
+      cli::cli_process_start("Getting table IDs to check for deleted IDs")
+      ids <- get_table_ids(table_data, parallel_calls = parallel_calls)
+      cli::cli_process_done()
 
+      # Get full size of the table and the table IDs
+      full_table_size <- get_table_size(table_data$table)
+
+      # Compare numbers of downloaded ids and
+      # full table size to ensure all ids downloaded
+      diff <- length(ids) - full_table_size
+      
+    }
+  
+    cli::cli_alert_success("Number of downloaded IDs equals the number of expected table records.")
 
     # Load in cache
     cli::cli_process_start("Loading existing cache")
@@ -342,7 +360,7 @@ update_polis_table <- function(table_data, table_url, parallel_calls = TRUE, out
 
     cli::cli_process_done()
 
-  invisible()
+  invisible(updated_cache)
 
 }
 
@@ -363,7 +381,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
   urls <- create_table_urls(table_url, table_data, days_interval)
 
   cli::cli_process_start("Downloading data")
-  out <- call_urls(urls)
+  out <- call_urls_in_parallel(urls)
 
   if (nrow(out) != table_size) {
     error_message <- paste0(
@@ -470,7 +488,7 @@ download_full_polis_table <- function(table_data, table_url, parallel_calls = TR
   cli::cli_process_done()
   gc()
 
-  invisible()
+  invisible(out)
 
 }
 
@@ -536,7 +554,7 @@ get_table_data <- function(.table, api_key = Sys.getenv("POLIS_API_KEY"),
                      table_data$polis_id)
 
   id_return <- tryCatch(
-    call_single_url(api_url, times = 1),
+    call_urls_in_parallel(api_url),
     error = function(cond) {
       return("Error")
     }
@@ -746,9 +764,11 @@ fetch_missing_records <- function(table_data,
       }
 
       request_missing_recs <- gsub(" ", "%20", request_missing_recs)
-      missing_epids_data <- call_single_url(request_missing_recs)
 
-    }, .progress = TRUE) |> dplyr::bind_rows()
+    }, .progress = TRUE)
+
+    missing_epids_data <- missing_epids_data |> unlist()
+    missing_epids_data <- call_urls_in_parallel(missing_epids_data)
 
     create_extract_file(table_data, missing_epids_data)
 

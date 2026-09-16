@@ -20,107 +20,6 @@ test_polis_key <- function(key) {
   return(httr::status_code(get_result) == 200)
 }
 
-#' Call multiple URLs
-#'
-#' @description Call multiple URLs
-#' @param urls array of url strings
-#' @returns tibble with all data
-#' @export
-call_urls <- function(urls) {
-  doFuture::registerDoFuture() ## tell foreach to use future
-
-  if (stringr::str_starts(Sys.getenv("SF_PARTNER"), "posit_workbench")) {
-    future::plan(future::multicore)
-  } else {
-    future::plan(future::multisession) ## parallelize over a local PSOCK cluster
-  }
-
-  options(doFuture.rng.onMisuse = "ignore")
-  xs <- seq_along(urls)
-
-  progressr::handlers("cli")
-
-  progressr::with_progress({
-    p <- progressr::progressor(along = xs)
-    y <-
-      foreach::`%dopar%`(foreach::foreach(
-        x = xs,
-        .packages = c("tidypolis", "dplyr", "jsonlite", "httr")
-      ), {
-        # signal a progression update
-        p()
-        # jitter the parallel calls to not overwhelm the server
-        # Sys.sleep(1 + stats::rpois(1, 10)/100)
-        log <- dplyr::tibble(
-          time = Sys.time(),
-          call = urls[x],
-          event = "MADE CALL"
-        )
-
-        tryCatch(
-          {
-            response <- call_single_url(urls[x])
-            log <- log |>
-              dplyr::add_row(
-                time = Sys.time(),
-                call = urls[x],
-                event = "FINISHED CALL"
-              )
-          },
-          error = \(e) {
-            response <- NA
-            log <- log |>
-              dplyr::add_row(
-                time = Sys.time(),
-                call = urls[x],
-                event = "CALL FAILED"
-              )
-          }
-        )
-
-        dplyr::tibble(
-          response = list(response),
-          log = list(log)
-        )
-      })
-  })
-
-  resp <- dplyr::bind_rows(y) |>
-    dplyr::filter(!is.na(response)) |>
-    dplyr::pull(response) |>
-    dplyr::bind_rows()
-
-  # Convert string representations of NULL/NA to actual NA values
-  resp <- resp |>
-    dplyr::mutate(
-      dplyr::across(
-        dplyr::everything(),
-        ~ dplyr::case_when(
-          as.character(.x) %in% c("NULL", "NA", "") ~ NA_character_,
-          TRUE ~ as.character(.x)
-        )
-      )
-    )
-
-  # Infer and apply column types (works with sparse data)
-  resp <- readr::type_convert(resp, col_types = readr::cols())
-
-  log <- dplyr::bind_rows(y) |>
-    dplyr::pull(log) |>
-    dplyr::bind_rows()
-
-  if (as.logical(Sys.getenv("API_DEBUG"))) {
-    api_log <- tidypolis_io(io = "read", file_path = Sys.getenv("POLIS_API_LOG_FILE"))
-    api_log <- dplyr::bind_rows(api_log, log)
-    tidypolis_io(api_log,
-      io = "write", file_path = Sys.getenv("POLIS_API_LOG_FILE")
-    )
-  }
-
-  gc()
-  return(resp)
-}
-
 #### Logging ####
 
 #' Update local POLIS interaction log
@@ -2841,6 +2740,53 @@ s1_clean_case_table <- function(path, crosswalk,
   cli::cli_process_start("Removing empty columns")
   api_case_sub3 <- remove_empty_columns(api_case_sub3)
   cli::cli_process_done()
+
+  cli::cli_process_start("Checking for Contact epids classified as AFP")
+
+  afp_contacts_count<- api_case_sub3 |>
+    dplyr::mutate(
+      Year = lubridate::year(as.Date(.data[["Case Date"]])),
+      EPID = as.character(EPID),
+      Stool2_chr = trimws(as.character(.data[["Stool 2 Collection Date"]]))
+    ) |>
+    dplyr::filter(
+      .data[["Surveillance Type"]] == "AFP",
+      stringr::str_detect(
+        EPID,
+        stringr::regex("(HC\\d+|CC\\d+|C\\d+)$", ignore_case = TRUE)
+      ),
+      is.na(.data[["Stool 2 Collection Date"]]) | Stool2_chr == "",
+      !is.na(.data[["Paralysis Onset Date"]])
+    ) |>
+    dplyr::select(
+      `Place Admin 0`,
+      Year,
+      EPID,
+      `Surveillance Type`,
+      `Case Date`,
+      `Stool 1 Collection Date`,
+      `Stool 2 Collection Date`
+    ) |>
+    dplyr::arrange(`Place Admin 0`, Year, EPID)
+
+  if (nrow(afp_contacts_count) > 0) {
+    invisible(capture.output(
+      tidypolis_io(
+        io = "write",
+        file_path = paste0(
+          polis_data_folder, "/", output_folder_name,
+          "/afp_contacts_count.csv"
+        ),
+        obj = afp_contacts_count |>
+          dplyr::select(
+            `Place Admin 0`, EPID, `Date of Onset`,
+            `Stool 1 Collection Date`, `Stool 2 Collection Date`
+          )
+      )
+    ))
+  } else {
+    cli::cli_alert_success("AFP check: No matches found.")
+  }
 
   return(api_case_sub3)
 }
@@ -5649,10 +5595,12 @@ s2_compare_with_archive <- function(data,
   ))
 
   # Harmonize column selections
+  cols_to_keep <- c("datecreated", "datepublish", "dateupdated")
+
   data_prepared <- data_prepared |>
     dplyr::ungroup() |>
     dplyr::select(-c(setdiff(
-      setdiff(colnames(data_prepared), col_afp_raw),
+      setdiff(colnames(data_prepared), c(col_afp_raw, cols_to_keep)),
       colnames(old_data)
     )))
 
