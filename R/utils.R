@@ -2741,52 +2741,6 @@ s1_clean_case_table <- function(path, crosswalk,
   api_case_sub3 <- remove_empty_columns(api_case_sub3)
   cli::cli_process_done()
 
-  cli::cli_process_start("Checking for Contact epids classified as AFP")
-
-  afp_contacts_count<- api_case_sub3 |>
-    dplyr::mutate(
-      Year = lubridate::year(as.Date(.data[["Case Date"]])),
-      EPID = as.character(EPID),
-      Stool2_chr = trimws(as.character(.data[["Stool 2 Collection Date"]]))
-    ) |>
-    dplyr::filter(
-      .data[["Surveillance Type"]] == "AFP",
-      stringr::str_detect(
-        EPID,
-        stringr::regex("(HC\\d+|CC\\d+|C\\d+)$", ignore_case = TRUE)
-      ),
-      is.na(.data[["Stool 2 Collection Date"]]) | Stool2_chr == "",
-      !is.na(.data[["Paralysis Onset Date"]])
-    ) |>
-    dplyr::select(
-      `Place Admin 0`,
-      Year,
-      EPID,
-      `Surveillance Type`,
-      `Case Date`,
-      `Stool 1 Collection Date`,
-      `Stool 2 Collection Date`
-    ) |>
-    dplyr::arrange(`Place Admin 0`, Year, EPID)
-
-  if (nrow(afp_contacts_count) > 0) {
-    invisible(capture.output(
-      tidypolis_io(
-        io = "write",
-        file_path = paste0(
-          polis_data_folder, "/", output_folder_name,
-          "/afp_contacts_count.csv"
-        ),
-        obj = afp_contacts_count |>
-          dplyr::select(
-            `Place Admin 0`, EPID, `Date of Onset`,
-            `Stool 1 Collection Date`, `Stool 2 Collection Date`
-          )
-      )
-    ))
-  } else {
-    cli::cli_alert_success("AFP check: No matches found.")
-  }
 
   return(api_case_sub3)
 }
@@ -4629,9 +4583,9 @@ s2_fix_admin_guids <- function(data, shape_data) {
   # Format GUIDs with proper brackets
   data_with_guids <- data |>
     dplyr::mutate(
-      Admin2GUID = paste0("{", toupper(admin2guid), "}"),
-      Admin1GUID = paste0("{", toupper(admin1guid), "}"),
-      Admin0GUID = paste0("{", toupper(admin0guid), "}")
+      Admin2GUID = if_else(!is.na(admin2guid), paste0("{", toupper(admin2guid), "}"),NA),
+      Admin1GUID = if_else(!is.na(admin1guid), paste0("{", toupper(admin1guid), "}"),NA),
+      Admin0GUID = if_else(!is.na(admin0guid), paste0("{", toupper(admin0guid), "}"),NA)
     )
 
   # Extract country level data
@@ -5157,25 +5111,11 @@ s2_create_afp_variables <- function(data) {
         need60day == 1 & timeto60day >= 60 & timeto60day <= 90 ~ 1,
         (need60day == 1 & timeto60day < 60 | timeto60day > 90 |
           is.na(timeto60day) == TRUE) ~ 0
-      ),
+      )) |>
+    dplyr::rename(adm0guid = Admin0GUID,
+                  adm1guid = Admin1GUID,
+                  adm2guid = Admin2GUID) |>
 
-      # Format GUID strings
-      adm0guid = paste("{",
-        stringr::str_to_upper(admin0guid), "}",
-        sep = ""
-      ),
-      adm0guid = dplyr::if_else(
-        adm0guid == "{}" | adm0guid == "{NA}", NA, adm0guid
-      ),
-      adm1guid = paste("{", stringr::str_to_upper(admin1guid), "}", sep = ""),
-      adm1guid = dplyr::if_else(
-        adm1guid == "{}" | adm1guid == "{NA}", NA, adm1guid
-      ),
-      adm2guid = paste("{", stringr::str_to_upper(admin2guid), "}", sep = ""),
-      adm2guid = dplyr::if_else(
-        adm2guid == "{}" | adm2guid == "{NA}", NA, adm2guid
-      )
-    ) |>
     # Rename variables for consistency with existing naming conventions
     dplyr::rename_with(recode,
       stool.adequacy = "adequate.stool",
@@ -5184,8 +5124,7 @@ s2_create_afp_variables <- function(data) {
       `virus.cluster(s)` = "virus.cluster",
       `emergence.group(s)` = "emergence.group"
     ) |>
-    dplyr::filter(!is.na(epid)) |>
-    dplyr::select(-dplyr::any_of(c("Admin2GUID", "Admin1GUID", "Admin0GUID")))
+    dplyr::filter(!is.na(epid))
 
   cli::cli_process_done()
 
@@ -5308,7 +5247,6 @@ s2_export_afp_outputs <- function(data, latest_archive, polis_data_folder,
     )
   ))
 
-
   # Export spatial data
   afp_latlong <- data |>
     dplyr::ungroup() |>
@@ -5351,6 +5289,8 @@ s2_export_afp_outputs <- function(data, latest_archive, polis_data_folder,
   )) |>
     dplyr::filter(grepl("^.*(afp_linelist).*(.rds)$", name)) |>
     dplyr::pull(name)
+
+
 
   # Combine AFP files
   if (length(afp_files_combine) > 0) {
@@ -7991,7 +7931,11 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
   afp.01 <- afp.01[!duplicated(afp.01$epid), ] |>
     dplyr::select(
       epid, dateonset, place.admin.0, place.admin.1, place.admin.2, admin0guid, yronset, admin1guid, admin2guid, cdc.classification.all,
-      whoregion, nt.changes, emergence.group, virus.cluster, surveillancetypename, lat, lon, vtype.fixed, datenotificationtohq
+      whoregion, nt.changes, emergence.group, virus.cluster, surveillancetypename, lat, lon, vtype.fixed, datenotificationtohq,
+      sitepi_admin1_name,
+      sitepi_admin1_guid,
+      sitepi_admin2_name,
+      sitepi_admin2_guid
     )
 
   if (length(non.afp.files.01) > 0) {
@@ -8006,7 +7950,11 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
 
   # Combine AFP and other surveillance type cases
   afp.02 <- dplyr::bind_rows(afp.01, non.afp.01) |>
-    dplyr::select(epid, lat, lon, datenotificationtohq) |>
+    dplyr::select(epid, lat, lon, datenotificationtohq,
+                  sitepi_admin1_name,
+                  sitepi_admin1_guid,
+                  sitepi_admin2_name,
+                  sitepi_admin2_guid) |>
     dplyr::mutate(datenotificationtohq = parse_date_time(datenotificationtohq, c("%Y-%m-%d", "%d/%m/%Y")))
 
 
