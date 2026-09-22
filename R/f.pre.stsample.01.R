@@ -5,7 +5,6 @@
 #' @returns tibble with lat/lon for all unsampled locations
 #' @keywords internal
 f.pre.stsample.01 <- function(df01, global.dist.01) {
-
   # Add check to see if none of the df01 ADM2GUIDs exist in global.dist.01
   df_01_guid_check <- df01 |>
     dplyr::filter(Admin2GUID %in% unique(global.dist.01$GUID))
@@ -21,14 +20,13 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
       )
 
     return(df01)
-
   }
 
 
   # need to identify cases with no lat/lon
   empty.coord <- df01 |>
     dplyr::filter(is.na(polis.latitude) | is.na(polis.longitude) |
-                    (polis.latitude == 0 & polis.longitude == 0))
+      (polis.latitude == 0 & polis.longitude == 0))
 
   cli::cli_process_start("Spatially joining AFP cases to global districts")
   # create sf object from lat lon and make global.dist valid
@@ -40,9 +38,9 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
     )
 
   df01.sf <- suppressWarnings(sf::st_as_sf(df01.sf,
-      coords = c(x = "lon", y = "lat"),
-      crs = sf::st_crs(global.dist.01)
-    ))
+    coords = c(x = "lon", y = "lat"),
+    crs = sf::st_crs(global.dist.01)
+  ))
 
   global.dist.02 <- sf::st_make_valid(global.dist.01)
 
@@ -60,13 +58,13 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
   # do 2 seperate st_joins the first, df02, is for valid shapes and those attached cases
   df02 <- sf::st_join(df01.sf |>
-                        dplyr::filter(!Admin2GUID %in% invalid.shapes$GUID), valid.shapes, left = T) |>
+    dplyr::filter(!Admin2GUID %in% invalid.shapes$GUID), valid.shapes, left = T) |>
     dplyr::filter(yronset >= yr.st & yronset <= yr.end)
 
   # second st_join is for invalid shapes and those attached cases, turning off s2
   sf::sf_use_s2(F)
   df03 <- sf::st_join(df01.sf |>
-                        dplyr::filter(!Admin2GUID %in% valid.shapes$GUID), invalid.shapes, left = T) |>
+    dplyr::filter(!Admin2GUID %in% valid.shapes$GUID), invalid.shapes, left = T) |>
     dplyr::filter(yronset >= yr.st & yronset <= yr.end)
   sf::sf_use_s2(T)
 
@@ -202,8 +200,8 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
         tryCatch(
           expr = {
             suppressMessages(sf::st_sample(empty.coord.02[x, ],
-                                           dplyr::pull(empty.coord.02[x, ], "nperarm"),
-                                           exact = T
+              dplyr::pull(empty.coord.02[x, ], "nperarm"),
+              exact = T
             )) |> sf::st_as_sf()
           },
           error = function(e) {
@@ -226,7 +224,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
               sf::st_buffer(int, dist = 3000) |>
                 sf::st_sample(dplyr::slice(empty.coord.02, x) |>
-                                dplyr::pull(nperarm)) |>
+                  dplyr::pull(nperarm)) |>
                 sf::st_as_sf()
             })
           }
@@ -285,13 +283,12 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
   # bind back placed point cases with df06 and finished
   df09 <- df08 |>
-    dplyr::left_join(global.dist.01 |>
-                       dplyr::tibble() |>
-                       dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME,
-                                     Admin0GUID = ADM0_GUID,
-                                     Admin1GUID = ADM1_GUID,
-                                     Admin2GUID = GUID)
-    ) |>
+    dplyr::left_join(sf::st_drop_geometry(global.dist.01) |>
+      dplyr::select(ADM0_NAME, ADM1_NAME, ADM2_NAME,
+        Admin0GUID = ADM0_GUID,
+        Admin1GUID = ADM1_GUID,
+        Admin2GUID = GUID
+      )) |>
     dplyr::mutate(
       geo.corrected = dplyr::case_when(
         paste0("{", stringr::str_to_upper(admin2guid), "}") != Admin2GUID ~ 1,
@@ -311,17 +308,17 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
   final.guid.check <- df09 |>
     dplyr::filter((paste0("{", stringr::str_to_upper(admin2guid), "}", sep = "") != Admin2GUID |
-                     paste0("{", stringr::str_to_upper(admin1guid), "}", sep = "") != Admin1GUID |
-                     paste0("{", stringr::str_to_upper(admin0guid), "}", sep = "") != Admin0GUID) &
-                    geo.corrected == 0) |>
+      paste0("{", stringr::str_to_upper(admin1guid), "}", sep = "") != Admin1GUID |
+      paste0("{", stringr::str_to_upper(admin0guid), "}", sep = "") != Admin0GUID) &
+      geo.corrected == 0) |>
     dplyr::select(epid, yronset, place.admin.0, place.admin.1, place.admin.2, admin0guid, admin1guid, admin2guid, Admin0GUID, Admin1GUID, Admin2GUID, geo.corrected)
 
 
   final.names.check <- df09 |>
     dplyr::select(epid, yronset, place.admin.0, place.admin.1, place.admin.2, admin0guid, admin1guid, admin2guid, Admin0GUID, Admin1GUID, Admin2GUID, geo.corrected) |>
     dplyr::filter((is.na(place.admin.0) & !is.na(admin0guid)) |
-                    (is.na(place.admin.1) & !is.na(admin1guid)) |
-                    (is.na(place.admin.2) & !is.na(admin2guid)))
+      (is.na(place.admin.1) & !is.na(admin1guid)) |
+      (is.na(place.admin.2) & !is.na(admin2guid)))
 
   if (nrow(final.guid.check) > 0 | nrow(final.names.check) > 0) {
     cli::cli_alert_warning("A GUID or name has been misclassified, please run pre.stsample manually to identify")
