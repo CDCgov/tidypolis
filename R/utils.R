@@ -114,7 +114,6 @@ get_polis_cache <- function(cache_file = Sys.getenv("POLIS_CACHE_FILE"),
   } else {
     return(cache)
   }
-
 }
 
 
@@ -161,11 +160,12 @@ update_polis_cache <- function(cache_file = Sys.getenv("POLIS_CACHE_FILE"),
 #' @returns `tibble` crosswalk data
 #' @keywords internal
 get_crosswalk_data <- function(
-    file_loc = file.path(
-      Sys.getenv("POLIS_DATA_FOLDER"),
-      "misc",
-      "crosswalk.rds"
-    )) {
+  file_loc = file.path(
+    Sys.getenv("POLIS_DATA_FOLDER"),
+    "misc",
+    "crosswalk.rds"
+  )
+) {
   cli::cli_process_start("Import crosswalk")
   invisible(
     capture.output(
@@ -478,7 +478,6 @@ f.download.compare.02 <- function(df.from.f.download.compare.01,
   }
 }
 
->>>>>>> f5869e5 (Use qs2 and drop redundant line)
 #' Function for data qa check in AFP line list cleaning
 #' @description function creates a new variable when combined with a mutate statement in R code
 #' @param date1 date 1 is the date to be checked against date2
@@ -698,17 +697,17 @@ log_report <- function(log_file = Sys.getenv("POLIS_LOG_FILE"),
   # coms section
   sirfunctions::send_teams_message(msg = paste0("New CORE data files info: ", report_info))
   sirfunctions::send_teams_message(msg = paste0("New CORE data files alerts: ", report_alert))
-    attach = c(
-      file.path(tempdir(), "changed_virus_type.csv"),
-      file.path(tempdir(), "changed_virus_class.csv"),
-      file.path(tempdir(), "new_virus_records.csv")
-      )
-    if (length(attach[file.exists(attach)]) > 0) {
-      sirfunctions::send_teams_message(
-        msg = "Attached CSVs contain information on new/changed virus records",
-        attach = attach[file.exists(attach)]
-        )
-    }
+  attach <- c(
+    file.path(tempdir(), "changed_virus_type.csv"),
+    file.path(tempdir(), "changed_virus_class.csv"),
+    file.path(tempdir(), "new_virus_records.csv")
+  )
+  if (length(attach[file.exists(attach)]) > 0) {
+    sirfunctions::send_teams_message(
+      msg = "Attached CSVs contain information on new/changed virus records",
+      attach = attach[file.exists(attach)]
+    )
+  }
 }
 
 
@@ -861,10 +860,10 @@ create_response_vars <- function(pos,
   # cVDPV1 <- tOPV / bOPV / mOPV1
   # cVDPV3 <- tOPV / bOPV / mOPV3
   type1 <- dplyr::left_join(pos.sub |> dplyr::filter(measurement == "cVDPV 1"),
-                            sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "bOPV", "mOPV1")),
-                            by = c("admin2guid" = "adm2guid"),
-                            relationship = "many-to-many"
-                            ) |>
+    sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "bOPV", "mOPV1")),
+    by = c("admin2guid" = "adm2guid"),
+    relationship = "many-to-many"
+  ) |>
     dplyr::mutate(time.to.response = difftime(sub.activity.start.date, dateonset, units = "days")) |>
     dplyr::filter(
       sub.activity.start.date < Sys.Date(),
@@ -874,9 +873,10 @@ create_response_vars <- function(pos,
     unique()
 
   type2 <- dplyr::left_join(pos.sub |> dplyr::filter(measurement == "cVDPV 2"),
-                            sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "nOPV2", "mOPV2")),
-                            by = c("admin2guid" = "adm2guid"),
-                            relationship = "many-to-many") |>
+    sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "nOPV2", "mOPV2")),
+    by = c("admin2guid" = "adm2guid"),
+    relationship = "many-to-many"
+  ) |>
     dplyr::mutate(time.to.response = difftime(sub.activity.start.date, dateonset, units = "days")) |>
     dplyr::filter(
       sub.activity.start.date < Sys.Date(),
@@ -886,9 +886,10 @@ create_response_vars <- function(pos,
     unique()
 
   type3 <- dplyr::left_join(pos.sub |> dplyr::filter(measurement == "cVDPV 3"),
-                            sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "bOPV", "mOPV3")),
-                            by = c("admin2guid" = "adm2guid"),
-                            relationship = "many-to-many") |>
+    sia.sub |> dplyr::filter(vaccine.type %in% c("tOPV", "bOPV", "mOPV3")),
+    by = c("admin2guid" = "adm2guid"),
+    relationship = "many-to-many"
+  ) |>
     dplyr::mutate(time.to.response = difftime(sub.activity.start.date, dateonset, units = "days")) |>
     dplyr::filter(
       sub.activity.start.date < Sys.Date(),
@@ -897,7 +898,6 @@ create_response_vars <- function(pos,
     ) |>
     unique()
 
-  finished.responses <- dplyr::bind_rows(type1, type2, type3) |>
   finished.responses <- dplyr::bind_rows(type1, type2, type3) |>
     dplyr::group_by(epid, ntchanges, emergencegroup) |>
     dplyr::mutate(finished.responses = n()) |>
@@ -918,10 +918,13 @@ create_response_vars <- function(pos,
     dplyr::mutate(planned.campaigns = n()) |>
     dplyr::ungroup()
 
-  planned.responses <- dplyr::left_join(pos.sub, planned.sia |> dplyr::select(adm2guid, planned.campaigns,
-                                                                              sub.activity.start.date),
-                                        by = c("admin2guid" = "adm2guid"),
-                                        relationship = "many-to-many") |>
+  planned.responses <- dplyr::left_join(pos.sub, planned.sia |> dplyr::select(
+    adm2guid, planned.campaigns,
+    sub.activity.start.date
+  ),
+  by = c("admin2guid" = "adm2guid"),
+  relationship = "many-to-many"
+  ) |>
     dplyr::mutate(planned.campaigns = ifelse(is.na(planned.campaigns), 0, planned.campaigns)) |>
     unique() |>
     dplyr::select(epid, dateonset, ntchanges, emergencegroup, planned.campaigns, sub.activity.start.date) |>
@@ -929,13 +932,16 @@ create_response_vars <- function(pos,
 
   # identify completed ipv campaigns
   ipv.response <- dplyr::left_join(pos.sub,
-                                   sia.sub |>
-                                     dplyr::filter(vaccine.type == "IPV") |>
-                                     dplyr::select(sub.activity.start.date, adm2guid),
-                                   by = c("admin2guid" = "adm2guid"),
-                                   relationship = "many-to-many") |>
-    dplyr::filter(dateonset < sub.activity.start.date,
-                  difftime(sub.activity.start.date, dateonset, units = "days") <= 180) |>
+    sia.sub |>
+      dplyr::filter(vaccine.type == "IPV") |>
+      dplyr::select(sub.activity.start.date, adm2guid),
+    by = c("admin2guid" = "adm2guid"),
+    relationship = "many-to-many"
+  ) |>
+    dplyr::filter(
+      dateonset < sub.activity.start.date,
+      difftime(sub.activity.start.date, dateonset, units = "days") <= 180
+    ) |>
     dplyr::group_by(epid, ntchanges, emergencegroup, admin2guid) |>
     dplyr::mutate(ipv.campaigns = n()) |>
     dplyr::ungroup() |>
@@ -952,11 +958,14 @@ create_response_vars <- function(pos,
     )
 
   pos.final <- dplyr::left_join(pos, pos.sub.03,
-                                c("epid", "dateonset", "place.admin.0",
-                                  "place.admin.1", "place.admin.2", "adm0guid",
-                                  "yronset", "adm1guid", "admin2guid",
-                                  "ntchanges", "emergencegroup", "measurement"),
-                                relationship = "many-to-many") |>
+    c(
+      "epid", "dateonset", "place.admin.0",
+      "place.admin.1", "place.admin.2", "adm0guid",
+      "yronset", "adm1guid", "admin2guid",
+      "ntchanges", "emergencegroup", "measurement"
+    ),
+    relationship = "many-to-many"
+  ) |>
     dplyr::select(-sub.activity.start.date) |>
     unique()
 
@@ -1080,7 +1089,8 @@ check_missingness <- function(data,
     missing_by_group <- data |>
       dplyr::select("yronset", "place.admin.0", dplyr::any_of(afp.vars)) |>
       dplyr::summarise(dplyr::across(dplyr::everything(), ~ mean(is.na(.)) * 100),
-                       .by = c("yronset", "place.admin.0")) |>
+        .by = c("yronset", "place.admin.0")
+      ) |>
       dplyr::filter(dplyr::if_any(dplyr::any_of(afp.vars), ~ . >= 10))
 
     invisible(capture.output(
@@ -1349,13 +1359,15 @@ preprocess_cdc <- function(polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
   # Step 5 - Creating Virus datasets ====
   cli::cli_h1("Step 5/5 - Creating Virus datasets")
 
-  s5_fully_process_pos_data(polis_folder = polis_folder,
-                            polis_data_folder = polis_data_folder,
-                            latest_folder_in_archive,
-                            long.global.dist.01,
-                            output_folder_name = output_folder_name,
-                            output_format = output_format,
-                            archive = archive)
+  s5_fully_process_pos_data(
+    polis_folder = polis_folder,
+    polis_data_folder = polis_data_folder,
+    latest_folder_in_archive,
+    long.global.dist.01,
+    output_folder_name = output_folder_name,
+    output_format = output_format,
+    archive = archive
+  )
 
   update_polis_log(
     .event = "Processing of CORE datafiles complete",
@@ -1996,8 +2008,10 @@ process_spatial <- function(gdb_folder,
   if (endyr == lubridate::year(format(Sys.time())) & startyr == 2000) {
     prov.shape.issue.01 <- long.global.prov.01 |>
       dplyr::group_by(ADM0_NAME, ADM1_NAME, active.year.01) |>
-      dplyr::summarise(no.of.shapes = dplyr::n(),
-                       .groups = "drop") |>
+      dplyr::summarise(
+        no.of.shapes = dplyr::n(),
+        .groups = "drop"
+      ) |>
       dplyr::filter(no.of.shapes > 1)
 
     if (edav) {
@@ -2049,8 +2063,10 @@ process_spatial <- function(gdb_folder,
   if (endyr == year(format(Sys.time())) & startyr == 2000) {
     dist.shape.issue.01 <- long.global.dist.01 |>
       dplyr::group_by(ADM0_NAME, ADM1_NAME, ADM2_NAME, active.year.01) |>
-      dplyr::summarise(no.of.shapes = dplyr::n(),
-                       .groups = "drop") |>
+      dplyr::summarise(
+        no.of.shapes = dplyr::n(),
+        .groups = "drop"
+      ) |>
       dplyr::filter(no.of.shapes > 1)
 
     if (edav) {
@@ -2136,8 +2152,10 @@ add_gpei_cases <- function(azcontainer = suppressMessages(get_azure_storage_conn
     proxy.data.fill.prov.01 <- proxy.data.fill.prov |>
       dplyr::as_tibble() |>
       dplyr::group_by(adm1guid) |>
-      dplyr::summarise(nperarm = dplyr::n(),
-                       .groups = "drop") |>
+      dplyr::summarise(
+        nperarm = dplyr::n(),
+        .groups = "drop"
+      ) |>
       dplyr::arrange(adm1guid) |>
       dplyr::mutate(id = dplyr::row_number()) |>
       dplyr::filter(adm1guid != "{NA}")
@@ -2241,8 +2259,10 @@ add_gpei_cases <- function(azcontainer = suppressMessages(get_azure_storage_conn
     proxy.data.fill.ctry.01 <- proxy.data.fill.ctry |>
       dplyr::as_tibble() |>
       dplyr::group_by(adm0guid) |>
-      dplyr::summarise(nperarm = dplyr::n(),
-                       .groups = "drop") |>
+      dplyr::summarise(
+        nperarm = dplyr::n(),
+        .groups = "drop"
+      ) |>
       dplyr::arrange(adm0guid) |>
       dplyr::mutate(id = dplyr::row_number()) |>
       dplyr::filter(adm0guid != "{NA}")
@@ -2514,7 +2534,8 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
     api_case_data <- api_case_data |>
       dplyr::filter(`WHO Region` == who_region)
     cli::cli_alert_success(
-      paste0("Filtered case data to region: ", who_region))
+      paste0("Filtered case data to region: ", who_region)
+    )
   }
 
   cli::cli_h2("Environmental Samples")
@@ -2527,7 +2548,8 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
     api_es_data <- api_es_data |>
       dplyr::filter(`WHO Region` == who_region)
     cli::cli_alert_success(
-      paste0("Filtered ES data to region: ", who_region))
+      paste0("Filtered ES data to region: ", who_region)
+    )
   }
 
   cli::cli_h2("Virus")
@@ -2540,7 +2562,8 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
     api_virus_data <- api_virus_data |>
       dplyr::filter(`WHO Region` == who_region)
     cli::cli_alert_success(
-      paste0("Filtered Virus data to region: ", who_region))
+      paste0("Filtered Virus data to region: ", who_region)
+    )
   }
 
   cli::cli_h2("Activity")
@@ -2554,7 +2577,8 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
     api_activity_data <- api_activity_data |>
       dplyr::filter(`WHORegion` == who_region)
     cli::cli_alert_success(
-      paste0("Filtered Activity data to region: ", who_region))
+      paste0("Filtered Activity data to region: ", who_region)
+    )
   }
 
   cli::cli_h2("Sub-activity")
@@ -2569,7 +2593,8 @@ s1_prep_polis_tables <- function(polis_folder, polis_data_folder,
     api_subactivity_data <- api_subactivity_data |>
       dplyr::filter(WHORegion == who_region)
     cli::cli_alert_success(
-      paste0("Filtered Sub-activity data to region: ", who_region))
+      paste0("Filtered Sub-activity data to region: ", who_region)
+    )
   }
 
   rm(crosswalk_data)
@@ -2726,7 +2751,7 @@ s1_clean_case_table <- function(path, crosswalk,
 
   cli::cli_process_start("Checking for Contact epids classified as AFP")
 
-  afp_contacts_count<- api_case_sub3 |>
+  afp_contacts_count <- api_case_sub3 |>
     dplyr::mutate(
       Year = lubridate::year(as.Date(.data[["Case Date"]])),
       EPID = as.character(EPID),
@@ -3385,14 +3410,18 @@ s1_create_change_log <- function(polis_data_folder,
 
   potential_duplicates_new <- new |>
     dplyr::group_by(Id) |>
-    dplyr::summarise(count = n(),
-                     .groups = "drop") |>
+    dplyr::summarise(
+      count = n(),
+      .groups = "drop"
+    ) |>
     dplyr::filter(count >= 2)
 
   potential_duplicates_old <- old |>
     dplyr::group_by(Id) |>
-    dplyr::summarise(count = n(),
-                     .groups = "drop") |>
+    dplyr::summarise(
+      count = n(),
+      .groups = "drop"
+    ) |>
     dplyr::filter(count >= 2)
 
   new <- new |>
@@ -3471,20 +3500,22 @@ s1_create_change_log <- function(polis_data_folder,
       polis_data_folder,
       output_folder_name,
       "Change Log",
-      timestamp, paste0(tools::file_path_sans_ext(file), ".rds"))
+      timestamp, paste0(tools::file_path_sans_ext(file), ".rds")
+    )
   )))
 
   invisible(capture.output(
     if (archive) {
       # Move most recent to archive
       tidypolis_io(io = "read", file_path = file.path(polis_data_folder, output_folder_name, file)) |>
-      tidypolis_io(io = "write", file_path = file.path(polis_data_folder, output_folder_name,
-                                                       "Archive", timestamp, file))
+        tidypolis_io(io = "write", file_path = file.path(
+          polis_data_folder, output_folder_name,
+          "Archive", timestamp, file
+        ))
     }
   ))
 
   invisible(capture.output(
-
     # Delete the original file
     tidypolis_io(io = "delete", file_path = file.path(polis_data_folder, output_folder_name, file))
   ))
@@ -3754,7 +3785,8 @@ s2_fully_process_afp_data <- function(polis_data_folder, polis_folder,
   has_duplicates <- s2_check_duplicated_epids(
     data = afp_raw_new,
     polis_data_folder = polis_data_folder,
-    output_folder_name = output_folder_name)
+    output_folder_name = output_folder_name
+  )
 
   if (has_duplicates) {
     cli::cli_alert_warning("Please review duplicates!")
@@ -4104,10 +4136,10 @@ s2_standardize_dates <- function(data) {
       ),
       yronset = lubridate::year(dateonset),
       yronset = dplyr::if_else(is.na(yronset),
-                               lubridate::year(datestool1), yronset
+        lubridate::year(datestool1), yronset
       ),
       yronset = dplyr::if_else(is.na(datestool1) & is.na(yronset),
-                               lubridate::year(datenotify), yronset
+        lubridate::year(datenotify), yronset
       ),
       age.months = as.numeric(`calculated.age.(months)`),
       ontostool1 = as.numeric(datestool1 - dateonset),
@@ -4130,14 +4162,16 @@ s2_standardize_dates <- function(data) {
         ~ lubridate::ymd(as.Date(., tryFormats = c("%Y-%m-%dT%H:%M:%S", "%d/%m/%Y")), quiet = TRUE)
       )
     ) |>
-    dplyr::mutate(datenotificationtohq = date.notification.to.hq,
-                  casedate = case.date,
-                  stooltolabdate = stool.date.sent.to.lab,
-                  stooltoiclabdate = stool.date.sent.to.ic.lab,
-                  clinicadmitdate = clinical.admitted.date,
-                  datecreated = lubridate::as_datetime(created.date),
-                  datepublish = lubridate::as_datetime(publishdate),
-                  dateupdated = lubridate::as_datetime(last.updated.date))
+    dplyr::mutate(
+      datenotificationtohq = date.notification.to.hq,
+      casedate = case.date,
+      stooltolabdate = stool.date.sent.to.lab,
+      stooltoiclabdate = stool.date.sent.to.ic.lab,
+      clinicadmitdate = clinical.admitted.date,
+      datecreated = lubridate::as_datetime(created.date),
+      datepublish = lubridate::as_datetime(publishdate),
+      dateupdated = lubridate::as_datetime(last.updated.date)
+    )
 
   cli::cli_process_done()
 
@@ -4570,10 +4604,10 @@ s2_validate_classifications <- function(data, output_folder_name) {
       dplyr::pull(epid)
 
     # List of cases already flagged to POLIS that can be skipped
-    #flagged_to_polis <- c("MOZ-TET-TSA-22-006")
+    # flagged_to_polis <- c("MOZ-TET-TSA-22-006")
 
     # Remove known cases from consideration
-    #epids <- epids[!epids %in% flagged_to_polis]
+    # epids <- epids[!epids %in% flagged_to_polis]
 
     # If unknown "none" classifications remain, raise an error
     if (length(epids) > 0) {
@@ -4589,11 +4623,15 @@ s2_validate_classifications <- function(data, output_folder_name) {
       )
 
       cli::cli_alert_info("Please see output afp_epids_none_classification.parquet for details")
-      tidypolis_io(to_check |>
-                     dplyr::filter(cdc.classification.all == "none"),
-                   io = "write",
-                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
-                                         output_folder_name, "afp_epids_none_classification.parquet"))
+      tidypolis_io(
+        to_check |>
+          dplyr::filter(cdc.classification.all == "none"),
+        io = "write",
+        file_path = file.path(
+          Sys.getenv("POLIS_DATA_CACHE"),
+          output_folder_name, "afp_epids_none_classification.parquet"
+        )
+      )
     }
   }
 
@@ -4922,7 +4960,7 @@ s2_process_coordinates <- function(data, polis_data_folder, polis_folder,
       dplyr::select(-c("epid", "dup_epid")) |>
       dplyr::rename(epid = epid_fixed) |>
       dplyr::bind_rows(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
-      dplyr::bind_rows(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
+    dplyr::bind_rows(data_renamed |> filter(!epid %in% dup_epid_fixed$epid))
 
 
     cli::cli_alert_warning(paste0(
@@ -6647,11 +6685,12 @@ s3_sia_cluster_dates_by_vax_type <- function(data,
 #' @keywords internal
 #'
 s3_sia_merge_cluster_dates_final_data <- function(
-    sia.clean.01,
-    polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
-    polis_data_folder = file.path(polis_folder, "data"),
-    output_folder_name,
-    output_format) {
+  sia.clean.01,
+  polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
+  polis_data_folder = file.path(polis_folder, "data"),
+  output_folder_name,
+  output_format
+) {
   cli::cli_process_start("Reading in cached SIA cluster data")
   sia.clusters <- dplyr::tibble(name = tidypolis_io(
     io = "list",
@@ -6800,10 +6839,11 @@ s3_sia_evaluate_unmatched_guids <- function(sia.05, polis_data_folder, output_fo
 #'
 #' @export
 s4_fully_process_es_data <- function(
-    polis_folder,
-    polis_data_folder, latest_folder_in_archive,
-    output_folder_name,
-    output_format) {
+  polis_folder,
+  polis_data_folder, latest_folder_in_archive,
+  output_folder_name,
+  output_format
+) {
   if (!tidypolis_io(
     io = "exists.dir",
     file_path = file.path(polis_data_folder, output_folder_name)
@@ -7163,8 +7203,10 @@ s4_es_data_processing <- function(es.01.new,
 
   es.space.03 <- es.space.02 |>
     dplyr::group_by(env.sample.manual.edit.id) |>
-    dplyr::summarise(virus.type.01 = paste(virus.type, collapse = ", "),
-                     .groups = "drop")
+    dplyr::summarise(
+      virus.type.01 = paste(virus.type, collapse = ", "),
+      .groups = "drop"
+    )
 
   es.space.03$virus.type.01[es.space.03$virus.type.01 == "NA"] <- NA
 
@@ -7529,9 +7571,10 @@ s5_fully_process_pos_data <- function(polis_folder,
                                       polis_data_folder = file.path(polis_folder, "data"),
                                       output_folder_name,
                                       output_format, archive) {
-
-  virus.raw.new <- s5_pos_load_data(polis_data_folder, latest_folder_in_archive,
-                                    output_folder_name)
+  virus.raw.new <- s5_pos_load_data(
+    polis_data_folder, latest_folder_in_archive,
+    output_folder_name
+  )
   virus.01 <- s5_pos_create_cdc_vars(virus.raw.new, polis_folder, polis_data_folder)
 
   s5_pos_check_duplicates(virus.01, polis_data_folder, output_folder_name)
@@ -7560,10 +7603,11 @@ s5_fully_process_pos_data <- function(polis_folder,
   rm(afp.es.virus.02)
 
   if (archive) {
-  s5_pos_compare_with_archive(afp.es.virus.01, afp.es.virus.03,
-                              polis_data_folder, latest_folder_in_archive,
-                              output_folder_name = output_folder_name,
-                              output_format = output_format)
+    s5_pos_compare_with_archive(afp.es.virus.01, afp.es.virus.03,
+      polis_data_folder, latest_folder_in_archive,
+      output_folder_name = output_folder_name,
+      output_format = output_format
+    )
   }
 
   s5_pos_evaluate_unmatched_guids(afp.es.virus.03, long.global.dist.01,
