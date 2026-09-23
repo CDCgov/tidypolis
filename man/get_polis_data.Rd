@@ -7,8 +7,19 @@
 get_polis_data(type = "all", parallel_calls = TRUE)
 }
 \arguments{
-\item{type}{\code{str} Choose to download population data ("pop") or all other data. Defaults to "all",
-which includes Virus, Case, Human Specimen, Environmental Sample, Activity, Subactivity, LQAS, and IM.}
+\item{type}{\code{str} A string or a list of strings of tables to download. Defaults to "all".
+May choose to download population data ("pop") or all other tables:
+\itemize{
+\item "activity": activities are all actions taken against Poliovirus.
+\item "case": all identified cases of Poliovirus.
+\item "environmental_sample": environmental surveillance data.
+\item "human_specimen":  all specimens sent to laboratories to be investigated.
+\item "im": independent monitoring data.
+\item "lqas": lot quality assurance sampling.
+\item "sub_activity": children activities are all sub-activities taken against Poliovirus.
+\item "virus": all data related with viruses.
+which includes Virus, Case, Human Specimen, Environmental Sample, Activity, Subactivity, LQAS, and IM.
+}}
 
 \item{parallel_calls}{\code{str} Whether to get table IDs using parallel calls. Defaults to \code{TRUE}.}
 }

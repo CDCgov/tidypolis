@@ -21,13 +21,8 @@ files will be saved. Defaults to "Core_Ready_Files". For
 region-specific processing, this should be set to
 "Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").}
 
-<<<<<<< HEAD
 \item{output_format}{\code{str} output_format to save files as.
-Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
-=======
-\item{output_format}{str: output_format to save files as.
 Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
->>>>>>> 4154afb (Add option to use qs file formats)
 'rds'.}
 }
 \description{

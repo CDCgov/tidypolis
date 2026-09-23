@@ -18,13 +18,7 @@ s5_pos_load_data(
 \item{output_folder_name}{\code{str} Name of the output directory where processed
 files will be saved. Defaults to "Core_Ready_Files". For
 region-specific processing, this should be set to
-<<<<<<< HEAD
-"Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").
-
-validation.}
-=======
-"Core_Ready_Files_\link{REGION}" (e.g., "Core_Ready_Files_AFRO").}
->>>>>>> 4154afb (Add option to use qs file formats)
+"Core_Ready_Files_REGION" (e.g., "Core_Ready_Files_AFRO").}
 }
 \value{
 \code{tibble} New virus dataset.
