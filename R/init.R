@@ -20,9 +20,10 @@
 #' }
 #' @export
 init_tidypolis <- function(
-    polis_folder = "POLIS",
-    edav = TRUE,
-    api_debug = FALSE) {
+  polis_folder = "POLIS",
+  edav = TRUE,
+  api_debug = FALSE
+) {
   if (api_debug) {
     Sys.setenv("API_DEBUG" = TRUE)
   } else {
@@ -319,14 +320,22 @@ init_tidypolis <- function(
 }
 
 
-
 #' Manager function to get and update POLIS data
 #'
 #' @description
 #' This function iterates through all tables and loads POLIS data. It
 #' checks to ensure that new rows are created, data are updated accordingly and
 #' deleted rows are reflected in the local system.
-#' @param type `str` Choose to download population data ("pop") or all other data. Defaults to "all",
+#' @param type `str` A string or a list of strings of tables to download. Defaults to "all".
+#' May choose to download population data ("pop") or all other tables:
+#' - "activity": activities are all actions taken against Poliovirus.
+#' - "case": all identified cases of Poliovirus.
+#' - "environmental_sample": environmental surveillance data.
+#' - "human_specimen":  all specimens sent to laboratories to be investigated.
+#' - "im": independent monitoring data.
+#' - "lqas": lot quality assurance sampling.
+#' - "sub_activity": children activities are all sub-activities taken against Poliovirus.
+#' - "virus": all data related with viruses.
 #' which includes Virus, Case, Human Specimen, Environmental Sample, Activity, Subactivity, LQAS, and IM.
 #' @param parallel_calls `str` Whether to get table IDs using parallel calls. Defaults to `TRUE`.
 #' @examples
@@ -335,10 +344,11 @@ init_tidypolis <- function(
 #' }
 #' @export
 get_polis_data <- function(type = "all", parallel_calls = TRUE) {
-
-  valid_types <- c("all", "virus", "case", "human_specimen",
-                   "environmental_sample", "activity", "sub_activity", "lqas",
-                   "im", "pop")
+  valid_types <- c(
+    "all", "virus", "case", "human_specimen",
+    "environmental_sample", "activity", "sub_activity", "lqas",
+    "im", "pop"
+  )
 
   if (length(type) == 1 && type == "all") {
     tables <- c(
@@ -353,7 +363,6 @@ get_polis_data <- function(type = "all", parallel_calls = TRUE) {
 
     sapply(tables, function(x) get_table_data(.table = x))
   } else if (length(type) == 1 && type == "pop") {
-
     update_polis_log(
       .event = "Start POLIS pop download",
       .event_type = "START"
@@ -381,7 +390,7 @@ get_polis_data <- function(type = "all", parallel_calls = TRUE) {
 
     has_all <- sum(stringr::str_detect(valid, "all"))
 
-    if(has_all >= 1) {
+    if (has_all >= 1) {
       cli::cli_abort("Please pass only 'all' or types excluding 'all'.")
     }
 
@@ -389,7 +398,6 @@ get_polis_data <- function(type = "all", parallel_calls = TRUE) {
   } else if (length(type) == 1 && type %in% valid_types) {
     get_table_data(type)
   }
-
 }
 
 
@@ -457,7 +465,7 @@ freeze_polis_data <- function() {
 #' @export
 preprocess_data <- function(type = "cdc", who_region = NULL, output_format = "parquet") {
   types <- c("cdc")
-  outputs <- c("rds", "rda", "csv", "qs",  "parquet")
+  outputs <- c("rds", "rda", "csv", "qs", "parquet")
 
   if (!(type %in% types)) {
     cli::cli_abort(message = paste0("'", type, "'", " is not one of the accepted values for 'type'"))
