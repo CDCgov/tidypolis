@@ -6726,16 +6726,7 @@ s3_sia_merge_cluster_dates_final_data <- function(
     dplyr::ungroup() |>
     dplyr::mutate(cdc.last.camp = ifelse(cdc.max.round == sub.activity.start.date, 1, 0))
 
-  sia.clean.02 <- dplyr::left_join(
-    sia.clean.01,
-    sia.rounds |>
-      dplyr::select(
-        sia.code, sia.sub.activity.code, adm2guid,
-        cluster, cluster_method, cdc.round.num,
-        cdc.max.round, cdc.last.camp
-      ),
-    by = c("sia.code", "sia.sub.activity.code", "adm2guid")
-  )
+  sia.clean.02 <- sia.clean.01
 
   cli::cli_process_done()
 
