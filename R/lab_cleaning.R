@@ -868,7 +868,7 @@ prep_lab_data <- function(lab_data_path,
 
   if (save_to_edav) {
     # COMMENTED OUT FOR NOW TO AVOID DISASTER
-    # tidypolis_io(obj = lab_data3, io = "write", file_path = "Data/lab/cleaned_lab_data.rda")
+     tidypolis_io(obj = lab_data3, io = "write", file_path = "Data/lab/cleaned_lab_data.rda")
   }
   else {
     cli::cli_alert_info("save_to_edav=FALSE, returning lab data as output object")
