@@ -5815,9 +5815,6 @@ s3_fully_process_sia_data <- function(long.global.dist.01, polis_data_folder,
     polis_data_folder
   )
 
-  # creates cache from clustered SIA dates
-  s3_sia_cluster_dates(sia.clean.01)
-
   # merged data with clustered data
   s3_sia_merge_cluster_dates_final_data(
     sia.clean.01 = sia.clean.01,
