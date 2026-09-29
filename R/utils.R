@@ -6690,7 +6690,6 @@ s3_sia_merge_cluster_dates_final_data <- function(
     output_folder_name,
     output_format) {
 
-
   cli::cli_process_start("Writing out final SIA dataset")
 
   invisible(capture.output(
