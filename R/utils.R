@@ -5815,9 +5815,6 @@ s3_fully_process_sia_data <- function(long.global.dist.01, polis_data_folder,
     polis_data_folder
   )
 
-  # creates cache from clustered SIA dates
-  s3_sia_cluster_dates(sia.clean.01)
-
   # merged data with clustered data
   s3_sia_merge_cluster_dates_final_data(
     sia.clean.01 = sia.clean.01,
@@ -6689,67 +6686,18 @@ s3_sia_merge_cluster_dates_final_data <- function(
     polis_data_folder = file.path(polis_folder, "data"),
     output_folder_name,
     output_format) {
-  cli::cli_process_start("Reading in cached SIA cluster data")
-  sia.clusters <- dplyr::tibble(name = tidypolis_io(
-    io = "list",
-    file_path = file.path(
-      polis_folder,
-      "misc",
-      "sia_cluster_cache"
-    ),
-    full_names = TRUE
-  )) |>
-    dplyr::filter(grepl("data_cluster_cache", name)) |>
-    dplyr::pull(name)
-
-  invisible(capture.output(
-    sia.rounds <- lapply(
-      sia.clusters,
-      function(x) {
-        tidypolis_io(io = "read", file_path = x)
-      }
-    )
-  ))
-
-  cli::cli_process_done()
-
-  cli::cli_process_start("Merging SIA clustered round data into primary SIA output")
-
-  sia.rounds <- sia.rounds |>
-    dplyr::bind_rows() |>
-    dplyr::arrange(adm2guid, sub.activity.start.date) |>
-    dplyr::group_by(adm2guid, vaccine.type, cluster) |>
-    dplyr::mutate(cdc.round.num = row_number()) |>
-    dplyr::ungroup() |>
-    dplyr::group_by(adm2guid) |>
-    dplyr::mutate(cdc.max.round = max(sub.activity.start.date)) |>
-    dplyr::ungroup() |>
-    dplyr::mutate(cdc.last.camp = ifelse(cdc.max.round == sub.activity.start.date, 1, 0))
-
-  sia.clean.02 <- dplyr::left_join(
-    sia.clean.01,
-    sia.rounds |>
-      dplyr::select(
-        sia.code, sia.sub.activity.code, adm2guid,
-        cluster, cluster_method, cdc.round.num,
-        cdc.max.round, cdc.last.camp
-      ),
-    by = c("sia.code", "sia.sub.activity.code", "adm2guid")
-  )
-
-  cli::cli_process_done()
 
   cli::cli_process_start("Writing out final SIA dataset")
 
   invisible(capture.output(
     tidypolis_io(
-      obj = sia.clean.02,
+      obj = sia.clean.01,
       io = "write",
       file_path = paste(
         polis_data_folder,
         "/", output_folder_name, "/",
-        paste("sia", min(sia.clean.02$yr.sia, na.rm = T),
-          max(sia.clean.02$yr.sia, na.rm = T),
+        paste("sia", min(sia.clean.01$yr.sia, na.rm = T),
+          max(sia.clean.01$yr.sia, na.rm = T),
           sep = "_"
         ),
         output_format,
