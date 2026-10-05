@@ -200,7 +200,6 @@ get_polis_cache <- function(cache_file = Sys.getenv("POLIS_CACHE_FILE"),
   } else {
     return(cache)
   }
-
 }
 
 
@@ -247,11 +246,12 @@ update_polis_cache <- function(cache_file = Sys.getenv("POLIS_CACHE_FILE"),
 #' @returns `tibble` crosswalk data
 #' @keywords internal
 get_crosswalk_data <- function(
-    file_loc = file.path(
-      Sys.getenv("POLIS_DATA_FOLDER"),
-      "misc",
-      "crosswalk.rds"
-    )) {
+  file_loc = file.path(
+    Sys.getenv("POLIS_DATA_FOLDER"),
+    "misc",
+    "crosswalk.rds"
+  )
+) {
   cli::cli_process_start("Import crosswalk")
   invisible(
     capture.output(
@@ -783,17 +783,17 @@ log_report <- function(log_file = Sys.getenv("POLIS_LOG_FILE"),
   # coms section
   sirfunctions::send_teams_message(msg = paste0("New CORE data files info: ", report_info))
   sirfunctions::send_teams_message(msg = paste0("New CORE data files alerts: ", report_alert))
-    attach = c(
-      file.path(tempdir(), "changed_virus_type.csv"),
-      file.path(tempdir(), "changed_virus_class.csv"),
-      file.path(tempdir(), "new_virus_records.csv")
-      )
-    if (length(attach[file.exists(attach)]) > 0) {
-      sirfunctions::send_teams_message(
-        msg = "Attached CSVs contain information on new/changed virus records",
-        attach = attach[file.exists(attach)]
-        )
-    }
+  attach <- c(
+    file.path(tempdir(), "changed_virus_type.csv"),
+    file.path(tempdir(), "changed_virus_class.csv"),
+    file.path(tempdir(), "new_virus_records.csv")
+  )
+  if (length(attach[file.exists(attach)]) > 0) {
+    sirfunctions::send_teams_message(
+      msg = "Attached CSVs contain information on new/changed virus records",
+      attach = attach[file.exists(attach)]
+    )
+  }
 }
 
 
@@ -3527,20 +3527,22 @@ s1_create_change_log <- function(polis_data_folder,
       polis_data_folder,
       output_folder_name,
       "Change Log",
-      timestamp, paste0(tools::file_path_sans_ext(file), ".rds"))
+      timestamp, paste0(tools::file_path_sans_ext(file), ".rds")
+    )
   )))
 
   invisible(capture.output(
     if (archive) {
       # Move most recent to archive
       tidypolis_io(io = "read", file_path = file.path(polis_data_folder, output_folder_name, file)) |>
-      tidypolis_io(io = "write", file_path = file.path(polis_data_folder, output_folder_name,
-                                                       "Archive", timestamp, file))
+        tidypolis_io(io = "write", file_path = file.path(
+          polis_data_folder, output_folder_name,
+          "Archive", timestamp, file
+        ))
     }
   ))
 
   invisible(capture.output(
-
     # Delete the original file
     tidypolis_io(io = "delete", file_path = file.path(polis_data_folder, output_folder_name, file))
   ))
@@ -4610,10 +4612,10 @@ s2_validate_classifications <- function(data, output_folder_name) {
       dplyr::pull(epid)
 
     # List of cases already flagged to POLIS that can be skipped
-    #flagged_to_polis <- c("MOZ-TET-TSA-22-006")
+    # flagged_to_polis <- c("MOZ-TET-TSA-22-006")
 
     # Remove known cases from consideration
-    #epids <- epids[!epids %in% flagged_to_polis]
+    # epids <- epids[!epids %in% flagged_to_polis]
 
     # If unknown "none" classifications remain, raise an error
     if (length(epids) > 0) {
@@ -4629,11 +4631,15 @@ s2_validate_classifications <- function(data, output_folder_name) {
       )
 
       cli::cli_alert_info("Please see output afp_epids_none_classification.parquet for details")
-      tidypolis_io(to_check |>
-                     dplyr::filter(cdc.classification.all == "none"),
-                   io = "write",
-                   file_path = file.path(Sys.getenv("POLIS_DATA_CACHE"),
-                                         output_folder_name, "afp_epids_none_classification.parquet"))
+      tidypolis_io(
+        to_check |>
+          dplyr::filter(cdc.classification.all == "none"),
+        io = "write",
+        file_path = file.path(
+          Sys.getenv("POLIS_DATA_CACHE"),
+          output_folder_name, "afp_epids_none_classification.parquet"
+        )
+      )
     }
   }
 
@@ -5816,7 +5822,7 @@ s3_fully_process_sia_data <- function(long.global.dist.01, polis_data_folder,
   )
 
   # merged data with clustered data
-  s3_sia_merge_cluster_dates_final_data(
+  s3_sia_export_outputs(
     sia.clean.01 = sia.clean.01,
     output_folder_name = output_folder_name,
     output_format = output_format
@@ -6662,11 +6668,11 @@ s3_sia_cluster_dates_by_vax_type <- function(data,
   return(out)
 }
 
-#' Merge and add in all cached cluster data
+#' Export sia.clean.01 as the clean dataset for SIA.
 #' @description
 #' s3_sia_cluster_dates() writes out the output of previously cached
 #' clustered data into the local cache. This functions reads in all cached
-#' clustered data and merged it into the existing SIA data
+#' clustered data and writes out the final SIA dataset.
 #'
 #' @param sia.clean.01 `tibble` all cleaned and historical SIA data without rounds
 #' @param polis_folder `str` Path to the POLIS folder.
@@ -6680,13 +6686,13 @@ s3_sia_cluster_dates_by_vax_type <- function(data,
 #' @returns `NULL` silently.
 #' @keywords internal
 #'
-s3_sia_merge_cluster_dates_final_data <- function(
-    sia.clean.01,
-    polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
-    polis_data_folder = file.path(polis_folder, "data"),
-    output_folder_name,
-    output_format) {
-
+s3_sia_export_outputs <- function(
+  sia.clean.01,
+  polis_folder = Sys.getenv("POLIS_DATA_FOLDER"),
+  polis_data_folder = file.path(polis_folder, "data"),
+  output_folder_name,
+  output_format
+) {
   cli::cli_process_start("Writing out final SIA dataset")
 
   invisible(capture.output(
@@ -6785,10 +6791,11 @@ s3_sia_evaluate_unmatched_guids <- function(sia.05, polis_data_folder, output_fo
 #'
 #' @export
 s4_fully_process_es_data <- function(
-    polis_folder,
-    polis_data_folder, latest_folder_in_archive,
-    output_folder_name,
-    output_format) {
+  polis_folder,
+  polis_data_folder, latest_folder_in_archive,
+  output_folder_name,
+  output_format
+) {
   if (!tidypolis_io(
     io = "exists.dir",
     file_path = file.path(polis_data_folder, output_folder_name)
