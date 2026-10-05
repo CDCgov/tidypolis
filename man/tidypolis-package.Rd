@@ -13,6 +13,7 @@ This package uses the POLIS API to ease download and processing of global Polio 
 
 Authors:
 \itemize{
+  \item Nishant Kishore \email{ynm2@cdc.gov} (\href{https://orcid.org/0000-0003-0408-2747}{ORCID})
   \item Nicholas Heaghney \email{uic3@cdc.gov}
   \item Mervin Keith Cuadera \email{xrg9@cdc.gov} (\href{https://orcid.org/0000-0003-4898-2659}{ORCID})
 }
