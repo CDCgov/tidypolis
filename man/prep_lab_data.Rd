@@ -10,7 +10,8 @@ prep_lab_data(
   lab_locs_path = NULL,
   use_edav = TRUE,
   save_to_edav = FALSE,
-  output_lab_checks = FALSE
+  output_lab_checks = FALSE,
+  all_regions = FALSE
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ prep_lab_data(
 \item{save_to_edav}{\code{logical} Whether to save Rda file to EDAV, Defaults to \code{FALSE}.}
 
 \item{output_lab_checks}{\code{logical} Whether to save CSV file with cases with implausible dates to the working directory, Defaults to \code{FALSE}.}
+
+\item{all_regions}{\code{logical} Whether to read one combined lab extract named \code{All_regions Lab Extract}. Defaults to \code{FALSE}.}
 }
 \value{
 \code{tibble} Cleaned lab data.
@@ -34,6 +37,7 @@ Main lab data preparation function.
 Requires Excel files from WHO saved to a local file path.
 Expects the names of Excel files to contain the pattern \verb{[Region] Lab Extract}
 and the Sheets within the Excel files to contain the pattern \verb{[Region] Lab data}
+If \code{all_regions = TRUE}, expects one combined extract named \code{All_regions Lab Extract}.
 }
 \details{
 uploads to EDAV if use_edav = TRUE, otherwise, returns the lab data frame as an output that can be written as a CSV file to a local directory

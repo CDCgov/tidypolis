@@ -335,7 +335,8 @@ prep_lab_data <- function(lab_data_path,
                           lab_locs_path = NULL,
                           use_edav = TRUE,
                           save_to_edav = FALSE,
-                          output_lab_checks = FALSE) {
+                          output_lab_checks = FALSE,
+                          all_regions = FALSE) {
 
   # 1. Extract ----
 
@@ -344,8 +345,73 @@ prep_lab_data <- function(lab_data_path,
   # loop over all the files
   # flexible in case we ever get WPRO data
 
-  who_regions = c("AFRO", "EMRO", "WPRO", "EURO", "SEARO", "PAHO")
-  region_pattern <- paste0("(", paste(who_regions, collapse = "|"), ").*Lab Extract")
+  who_regions <- c("AFRO", "EMRO", "WPRO", "EURO", "SEARO", "PAHO")
+  all_regions_pattern <- "All[_ ]regions.*Lab Extract"
+  region_pattern <- if (all_regions) {
+    all_regions_pattern
+  } else {
+    paste0("(", paste(who_regions, collapse = "|"), ").*Lab Extract")
+  }
+
+  select_latest_lab_file <- function(matched_files, label) {
+    file_dates <- lubridate::as_date(
+      stringr::str_extract(basename(matched_files), "\\d{4}-\\d{2}-\\d{2}")
+    )
+
+    if (length(matched_files) > 1) {
+      if (any(is.na(file_dates))) {
+        warning("Multiple files found for ", label,
+                " but not all filenames contain a valid YYYY-MM-DD date - using the first: ",
+                basename(matched_files[1]))
+        f <- matched_files[1]
+        file_date <- file_dates[1]
+      } else {
+        file_date <- file_dates[which.max(file_dates)]
+        f <- matched_files[which.max(file_dates)]
+        warning("Multiple files found for ", label, " - using the most recent: ", basename(f))
+      }
+    } else {
+      file_date <- file_dates[1]
+      f <- matched_files[1]
+    }
+
+    if (is.na(file_date)) {
+      file_date <- Sys.Date()
+    }
+
+    list(file = f, file_date = file_date)
+  }
+
+  find_lab_sheet <- function(f, sheet_pattern) {
+    if (!stringr::str_detect(f, stringr::regex("\\.xlsx$", ignore_case = TRUE))) {
+      return(NULL)
+    }
+
+    sheet_names <- readxl::excel_sheets(f)
+    target_sheet <- sheet_names[
+      stringr::str_detect(sheet_names, stringr::regex(sheet_pattern, ignore_case = TRUE))
+    ]
+
+    if (length(target_sheet) == 0 && length(sheet_names) == 1) {
+      target_sheet <- sheet_names[1]
+    }
+
+    if (length(target_sheet) == 0) {
+      warning("No matching Lab data sheet found in ", basename(f))
+      return(NA_character_)
+    }
+
+    target_sheet[1]
+  }
+
+  parse_lab_date_columns <- function(df) {
+    date_cols <- names(df)[
+      stringr::str_detect(names(df), stringr::regex("date", ignore_case = TRUE))
+    ]
+
+    df |>
+      dplyr::mutate(dplyr::across(dplyr::any_of(date_cols), parse_lab_date))
+  }
 
   # list the files following the pattern "[region] Lab Extract"
   files <- list.files(
@@ -364,72 +430,86 @@ prep_lab_data <- function(lab_data_path,
   lab_data_list <- list()
 
   cli::cli_process_start("Extracting data from Excel files")
-  # loop over the regions files, pull out the data into an element of a list
-  for (region in who_regions) {
+  if (all_regions) {
+    selected_file <- select_latest_lab_file(files, "all regions")
+    f <- selected_file$file
+    file_date <- selected_file$file_date
+    sheet_name <- find_lab_sheet(f, "All[_ ]regions.*Lab data|Lab data")
 
-    # find files matching this specific region + "Lab Extract"
-    pattern <- paste0(region, ".*Lab Extract")
-    matched_files <- files[stringr::str_detect(basename(files), stringr::regex(pattern, ignore_case = TRUE))]
-
-    if (length(matched_files) == 0) {
-      warning("No file found for region: ", region)
-      next
+    if (length(sheet_name) == 1 && is.na(sheet_name)) {
+      cli::cli_process_done()
+      return(character(0))
     }
 
-    if (length(matched_files) > 1) {
-      # extract YYYY-MM-DD from each filename and pick the most recent
-      file_dates <- lubridate::as_date(stringr::str_extract(basename(matched_files), "\\d{4}-\\d{2}-\\d{2}"))
+    df <- sirfunctions::load_lab_data(f, sheet_name = sheet_name)
 
-      if (any(is.na(file_dates))) {
-        warning("Multiple files found for region ", region,
-                " but not all filenames contain a valid YYYY-MM-DD date - using the first: ",
-                basename(matched_files[1]))
-        f <- matched_files[1]
-      } else {
-        # get the date of the latest file to check for cases with future dates entered in the system
-        file_date <- file_dates[which.max(file_dates)]
-        f <- matched_files[which.max(file_dates)]
-        warning("Multiple files found for region ", region, " - using the most recent: ", basename(f))
-      }
+    region_cols <- c(
+      "whoregion",
+      "WHORegion",
+      "WHO Region",
+      "who.region",
+      "WHO_Region",
+      "Region",
+      "region"
+    )
+    region_col <- region_cols[region_cols %in% names(df)]
+
+    if (length(region_col) > 0) {
+      df$whoregion <- as.character(df[[region_col[1]]])
     } else {
-      # even if only one file, still need the date of the file to compare against the date values
-      file_date <- lubridate::as_date(stringr::str_extract(basename(matched_files), "\\d{4}-\\d{2}-\\d{2}"))
-      f <- matched_files[1]
+      warning("No WHO region column found in ", basename(f),
+              "; setting whoregion to 'All_regions'.")
+      df$whoregion <- "All_regions"
     }
 
-    # construct the expected sheet name ("[Region] Lab data") if the file is an Excel
-    sheet_name <- NULL
-    if (stringr::str_ends(f, "//.xlsx")) {
-      sheet_names <- readxl::excel_sheets(f)
-      target_sheet <- sheet_names[stringr::str_detect(sheet_names, stringr::regex(paste0(region, ".*Lab data"), ignore_case = TRUE))]
+    df <- df |>
+      dplyr::mutate(source_file = basename(f), download_date = file_date) |>
+      parse_lab_date_columns()
 
-      if (length(target_sheet) == 0) {
-        warning("No matching Lab data sheet found in ", basename(f))
+    lab_data_list[["All_regions"]] <- df
+  } else {
+    # loop over the regions files, pull out the data into an element of a list
+    for (region in who_regions) {
+
+      # find files matching this specific region + "Lab Extract"
+      pattern <- paste0(region, ".*Lab Extract")
+      matched_files <- files[stringr::str_detect(basename(files), stringr::regex(pattern, ignore_case = TRUE))]
+
+      if (length(matched_files) == 0) {
+        warning("No file found for region: ", region)
         next
       }
-      sheet_name <- target_sheet[1]
+
+      selected_file <- select_latest_lab_file(matched_files, paste("region", region))
+      f <- selected_file$file
+      file_date <- selected_file$file_date
+
+      # construct the expected sheet name ("[Region] Lab data") if the file is an Excel
+      sheet_name <- find_lab_sheet(f, paste0(region, ".*Lab data"))
+
+      if (length(sheet_name) == 1 && is.na(sheet_name)) {
+        next
+      }
+
+      # load in the data from the sheet for this region
+      df <- sirfunctions::load_lab_data(f, sheet_name = sheet_name) |>
+        dplyr::mutate(source_file = basename(f), whoregion = region, download_date = file_date) |>
+        parse_lab_date_columns()
+
+      # add to the list of data tables
+      lab_data_list[[region]] <- df
     }
-
-    # if there's no file date, default to the current date
-    if (is.na(file_date)){
-      file_date=Sys.Date()
-    }
-    # load in the data from the sheet for this region
-    df <- sirfunctions::load_lab_data(f, sheet_name = sheet_name) |>
-      dplyr::mutate(source_file = basename(f), whoregion = region, download_date=file_date)
-
-    # convert any column with "date" in its name to Date type using the robust data parser function
-    date_cols <- names(df)[stringr::str_detect(names(df), stringr::regex("date", ignore_case = TRUE))]
-    df <- df |>
-      dplyr::mutate(dplyr::across(dplyr::any_of(date_cols), parse_lab_date))
-
-    # add to the list of data tables
-    lab_data_list[[region]] <- df
   }
   cli::cli_process_done()
 
   # drop any regions that had no file (keep only successfully read ones)
   lab_data_list <- lab_data_list[!sapply(lab_data_list, is.null)]
+
+  if (length(lab_data_list) == 0) {
+    warning("No lab data could be read from matching files in ", lab_data_path)
+    return(character(0))
+  }
+
 
   # confirm all the files have the same column names
   reference_region <- names(lab_data_list)[1]
@@ -767,7 +847,7 @@ prep_lab_data <- function(lab_data_path,
       days.seq.ship = DateIsolateRcvdForSeq - DateFinalCellCultureResult,
 
       ## timeliness of arrival at sequencing lab to sequencing results
-      days.seq.rec.res = DateofSequencing - DateIsolateRcvdForSeq,,
+      days.seq.rec.res = DateofSequencing - DateIsolateRcvdForSeq,
 
       # Interval measuring sequencing results from date of arrival (NOT part of KPI
       ## timeliness of ITD results to arrival at sequencing lab
@@ -867,8 +947,13 @@ prep_lab_data <- function(lab_data_path,
   # If save_to_edav is TRUE save to EDAV, otherwise return the data frame as an output of the function
 
   if (save_to_edav) {
-    # COMMENTED OUT FOR NOW TO AVOID DISASTER
-     tidypolis_io(obj = lab_data3, io = "write", file_path = "Data/lab/cleaned_lab_data.rda")
+    tidypolis_io(
+      obj = lab_data3,
+      io = "write",
+      file_path = "Data/lab/cleaned_lab_data.rda",
+      edav = TRUE,
+      object_name = "lab_data"
+    )
   }
   else {
     cli::cli_alert_info("save_to_edav=FALSE, returning lab data as output object")
