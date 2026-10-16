@@ -13,7 +13,7 @@ preprocess_data(type = "cdc", who_region = NULL, output_format = "parquet")
 Available inputs include AFRO, AMRO, EMRO, EURO, SEARO and  WPRO.}
 
 \item{output_format}{\code{str} Output_format to save files as.
-Available formats include 'rds' 'rda' 'csv' and 'parquet', Defaults is
+Available formats include 'rds' 'rda' 'csv' 'qs' and 'parquet', Defaults is
 'parquet'.}
 }
 \value{

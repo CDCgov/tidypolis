@@ -18,13 +18,14 @@
 #' list of file names. Otherwise, the function will return `NULL`. `exists.dir` and `exists.file` will return a `logical`.
 #' @keywords internal
 tidypolis_io <- function(
-    obj = NULL,
-    io,
-    file_path,
-    edav = as.logical(Sys.getenv("POLIS_EDAV_FLAG")),
-    azcontainer = suppressMessages(sirfunctions::get_azure_storage_connection()),
-    full_names = F,
-    edav_default_dir = "GID/PEB/SIR") {
+  obj = NULL,
+  io,
+  file_path,
+  edav = as.logical(Sys.getenv("POLIS_EDAV_FLAG")),
+  azcontainer = suppressMessages(sirfunctions::get_azure_storage_connection()),
+  full_names = F,
+  edav_default_dir = "GID/PEB/SIR"
+) {
   opts <- c("read", "write", "delete", "list", "exists.dir", "exists.file", "create")
 
   if (!io %in% opts) {
@@ -87,20 +88,19 @@ tidypolis_io <- function(
 
   if (io == "read") {
     if (edav) {
-
       if (!requireNamespace("AzureStor", quietly = TRUE)) {
         stop('Package "AzureStor" must be installed to read from EDAV.',
           .call = FALSE
         )
       }
-        return(sirfunctions::edav_io(
-          io = "read",
-          default_dir = edav_default_dir,
-          file_loc = file_path, azcontainer = azcontainer
-        ))
-      } else {
-      if (!grepl("\\.rds$|\\.rda$|\\.csv$|\\.parquet$", file_path)) {
-        stop("At the moment only 'rds' 'rda' 'csv' and 'parquet' are supported for reading.")
+      return(sirfunctions::edav_io(
+        io = "read",
+        default_dir = edav_default_dir,
+        file_loc = file_path, azcontainer = azcontainer
+      ))
+    } else {
+      if (!grepl("\\.rds$|\\.rda$|\\.csv$|\\.qs2$|\\.parquet$", file_path)) {
+        stop("At the moment only 'rds' 'rda' 'qs' 'qs2' 'csv' and 'parquet' are supported for reading.")
       }
 
       if (grepl("\\.rds$", file_path)) {
@@ -112,7 +112,16 @@ tidypolis_io <- function(
       }
 
       if (grepl("\\.csv$", file_path)) {
-        return(readr::read_csv(file_path, show_col_types = FALSE))
+        return(readr::read_csv(file_path,
+          show_col_types = FALSE,
+          col_types = readr::cols(
+            .default = "c"
+          )
+        ))
+      }
+
+      if (grepl("\\.qs2$", file_path)) {
+        return(qs2::qs_read(file_path))
       }
 
       if (grepl("\\.parquet$", file_path)) {
@@ -139,8 +148,10 @@ tidypolis_io <- function(
         azcontainer = azcontainer
       )
     } else {
-      if (!grepl("\\.rds$|\\.rda$|\\.csv$|\\.parquet$", file_path)) {
-        stop("At the moment only 'rds' 'rda' 'csv' and 'parquet' are supported for writing")
+      if (!grepl("\\.rds$|\\.rda$|\\.csv$|\\.qs$|\\.qs2$|\\.parquet$", file_path)) {
+        stop(
+          "At the moment only 'rds' 'rda' 'csv' 'qs' 'qs2'  and 'parquet' are supported for writing"
+        )
       }
 
       if (grepl("\\.rds$", file_path)) {
@@ -153,6 +164,10 @@ tidypolis_io <- function(
 
       if (grepl("\\.csv$", file_path)) {
         readr::write_csv(x = obj, file = file_path)
+      }
+
+      if (grepl("\\.qs2$", file_path)) {
+        qs2::qs_save(obj, file_path)
       }
 
       if (grepl("\\.parquet$", file_path)) {
@@ -210,9 +225,10 @@ tidypolis_io <- function(
 #' @returns `NULL`.
 #' @export
 upload_cdc_proc_to_edav <- function(
-    core_ready_folder = file.path(Sys.getenv("POLIS_DATA_CACHE"), "Core_Ready_Files"),
-    azcontainer = sirfunctions::get_azure_storage_connection(),
-    output_folder = "Data/polis") {
+  core_ready_folder = file.path(Sys.getenv("POLIS_DATA_CACHE"), "Core_Ready_Files"),
+  azcontainer = sirfunctions::get_azure_storage_connection(),
+  output_folder = "Data/polis"
+) {
   # check to see if folders exist
   if (tidypolis_io(io = "exists.dir", file_path = core_ready_folder)) {
     cli::cli_alert_info("Core File Identified")
