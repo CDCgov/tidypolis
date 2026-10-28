@@ -219,13 +219,20 @@ impute_missing_lab_geo <- function(lab_data, afp_data = NULL) {
 
     # Message for values without any province or district information
   } else {
-    cli::cli_alert_warning("AFP linelist not attached. Geographic columns will be empty.")
-    lab_data$ctry <- NA
-    lab_data$prov <- NA
-    lab_data$dist <- NA
-    lab_data$adm0guid <- NA
-    lab_data$adm1guid <- NA
-    lab_data$adm2guid <- NA
+    cli::cli_alert_warning("AFP linelist not attached. Retaining available geographic information.")
+    geo_sources <- list(
+      ctry = c("ctry", "country", "Name"),
+      prov = c("prov", "Province"),
+      dist = c("dist", "District"),
+      adm0guid = "adm0guid", adm1guid = "adm1guid", adm2guid = "adm2guid"
+    )
+    for (column in names(geo_sources)) {
+      values <- rep(NA_character_, nrow(lab_data))
+      for (source in intersect(geo_sources[[column]], names(lab_data))) {
+        values <- dplyr::coalesce(values, dplyr::na_if(trimws(as.character(lab_data[[source]])), ""))
+      }
+      lab_data[[column]] <- values
+    }
   }
 
   return(lab_data)
@@ -290,34 +297,133 @@ parse_lab_date <- function(x) {
   out
 }
 
+# Select the latest dated extract. Undated or invalid filenames retain the
+# original first-file fallback; use today's date when that file has no date.
+select_latest_lab_file <- function(matched_files, label) {
+  if (length(matched_files) == 0) {
+    stop("No lab files supplied for ", label, call. = FALSE)
+  }
+
+  file_dates <- lubridate::ymd(
+    stringr::str_extract(basename(matched_files), "\\d{4}-\\d{2}-\\d{2}"),
+    quiet = TRUE
+  )
+  selected <- 1L
+  if (length(matched_files) > 1) {
+    if (anyNA(file_dates)) {
+      warning("Multiple files found for ", label,
+              " but not all filenames contain a valid YYYY-MM-DD date - using the first: ",
+              basename(matched_files[1]))
+    } else {
+      selected <- which.max(file_dates)
+      warning("Multiple files found for ", label, " - using the most recent: ",
+              basename(matched_files[selected]))
+    }
+  }
+
+  file_date <- file_dates[selected]
+  if (is.na(file_date)) {
+    file_date <- Sys.Date()
+  }
+  list(file = matched_files[selected], file_date = file_date)
+}
+
+# Match a complete lab sheet name, optionally followed by a parenthesized
+# qualifier such as (AFP). A workbook containing only one sheet is accepted.
+find_lab_sheet <- function(f, region = NULL) {
+  if (!stringr::str_detect(f, stringr::regex("\\.xlsx$", ignore_case = TRUE))) {
+    return(NULL)
+  }
+
+  sheet_pattern <- if (is.null(region)) {
+    "^(All[_ ]regions.*Lab[_ ]data|Lab[_ ]data)( *\\([^)]*\\))?$"
+  } else {
+    paste0("^", region, ".*Lab[_ ]data( *\\([^)]*\\))?$")
+  }
+  sheet_names <- readxl::excel_sheets(f)
+  target_sheet <- sheet_names[
+    stringr::str_detect(sheet_names, stringr::regex(sheet_pattern, ignore_case = TRUE))
+  ]
+
+  if (length(target_sheet) == 0 && length(sheet_names) == 1) {
+    target_sheet <- sheet_names[1]
+  }
+  if (length(target_sheet) == 0) {
+    warning("No matching Lab data sheet found in ", basename(f))
+    return(NA_character_)
+  }
+  target_sheet[1]
+}
+
+# Normalize date columns while preserving identifiers and result columns.
+parse_lab_date_columns <- function(df) {
+  date_cols <- names(df)[
+    stringr::str_detect(names(df), stringr::regex("date", ignore_case = TRUE))
+  ]
+  df |>
+    dplyr::mutate(dplyr::across(dplyr::any_of(date_cols), parse_lab_date))
+}
+
 # Public functions ----
 #' Prep lab data
 #'
 #' Main lab data preparation function.
-#' Requires Excel files from WHO saved to a local file path.
-#' Expects the names of Excel files to contain the pattern `[Region] Lab Extract`
-#' and the Sheets within the Excel files to contain the pattern `[Region] Lab data`
+#' Reads WHO Excel (`.xlsx`) or CSV extracts from a local directory. Regional
+#' filenames must contain `[Region] Lab Extract`, where Region is AFRO, EMRO,
+#' WPRO, EURO, SEARO, or PAHO. With `all_regions = TRUE`, the filename must
+#' contain `All_regions Lab Extract`. Spaces and underscores in `Lab Extract`
+#' and `All_regions` are accepted, and matching is case insensitive.
+#' Filenames should include a valid `YYYY-MM-DD` download date anywhere in the
+#' name, for example `2026-06-30 AFRO Lab Extract.xlsx`. For multiple matches,
+#' the latest dated file is used; if any date is missing or invalid, the first
+#' file is used with a warning. An undated selected file uses today's date.
+#' Excel sheets must match `[Region] Lab data`, `All_regions Lab data`, or
+#' `Lab data` (the last two for combined extracts), optionally followed by a
+#' qualifier such as `(AFP)`. A workbook with only one sheet uses that sheet.
 #'
-#' uploads to EDAV if use_edav = TRUE, otherwise, returns the lab data frame as an output that can be written as a CSV file to a local directory
+#' The cleaned `lab_data` tibble is always returned. If `save_to_edav = TRUE`,
+#' it is also written to `Data/lab/cleaned_lab_data.rda` in EDAV under the
+#' internal object name `lab_data`.
 #'
-#' Will also output a CSV file with cases with implausible dates to the working directory if output_lab_checks=TRUE
+#' With `output_lab_checks = TRUE`, writes dated CSV reports of implausible
+#' dates and lab records whose EPIDs are absent from the supplied AFP linelist
+#' to the working directory. The missing-EPID report requires `afp_data`.
 #'
-#' @param lab_data_path `string` filepath to lab datasets.
+#' Dates after the extract's download date are replaced with `NA`. Stool
+#' collection dates before onset or more than 60 days after onset are also
+#' replaced with `NA`. Dispatch, receipt, culture, and sequencing dates are
+#' checked for chronological order; culture results more than 180 days after
+#' lab receipt are replaced with `NA`. Records with remaining negative lab
+#' turnaround intervals are removed.
+#'
+#' Only specimen numbers 1 and 2 are retained. Within each EPID/specimen pair,
+#' missing onset and collection dates are filled from other rows in that pair.
+#' One record is then retained, preferring the latest lab date, followed by the
+#' fewest missing dates; input order resolves any remaining ties.
+#'
+#' @param lab_data_path `string` Directory containing WHO lab extracts named
+#' as described above, including a download date in `YYYY-MM-DD` format.
 #' @param afp_data `tibble` AFP linelist. If using tidypolis, use `raw_data$afp`.
-#' @param lab_locs_path `str` Location of testing lab locations. Default is `NULL`. Will download from EDAV, if use_edav=TRUE.
-#' @param use_edav `logical` Whether to obtain lab locs data from EDAV Defaults to `TRUE`.
-#' @param save_to_edav `logical` Whether to save Rda file to EDAV, Defaults to `FALSE`.
-#' @param output_lab_checks `logical` Whether to save CSV file with cases with implausible dates to the working directory, Defaults to `FALSE`.
+#' @param lab_locs_path `string` Path to a local lab locations CSV. If `NULL`
+#' and `use_edav = TRUE`, lab locations are downloaded from EDAV.
+#' @param use_edav `logical` Whether to read lab locations from EDAV when
+#' `lab_locs_path` is `NULL`. Defaults to `TRUE`.
+#' @param save_to_edav `logical` Whether to also save the cleaned data to EDAV.
+#' Defaults to `FALSE`; the returned tibble can be saved locally by the caller.
+#' @param output_lab_checks `logical` Whether to write data quality CSV reports
+#' to the working directory. Defaults to `FALSE`.
+#' @param all_regions `logical` Whether to read one combined `All_regions Lab
+#' Extract` instead of separate regional extracts. Defaults to `FALSE`.
 #' @returns `tibble` Cleaned lab data.
 #' @examples
 #' \dontrun{
-#' With lab data and lab locs stored locally:
+#' # With lab data and lab locs stored locally:
 #' raw_data<-sirfunctions::get_all_polio_data(attach.spatial.data = FALSE)
 #' lab_data <- prep_lab_data(
 #' lab_data_path = "C:/Users/abc1/labdata/2026-06-30 Lab Extract (AFP only since 2023-30Jun2026)/",
 #' afp_data = raw_data$afp,
-#' lab_locs_path = "C:/Users/abc1/labdata/Routine lab testing locations.csv"
-#' use_edav=FALSE,
+#' lab_locs_path = "C:/Users/abc1/labdata/Routine lab testing locations.csv",
+#' use_edav=FALSE
 #' )
 #'
 #' # Using EDAV for lab locs:
@@ -346,80 +452,16 @@ prep_lab_data <- function(lab_data_path,
   # flexible in case we ever get WPRO data
 
   who_regions <- c("AFRO", "EMRO", "WPRO", "EURO", "SEARO", "PAHO")
-  all_regions_pattern <- "All[_ ]regions.*Lab Extract"
-  region_pattern <- if (all_regions) {
-    all_regions_pattern
-  } else {
-    paste0("(", paste(who_regions, collapse = "|"), ").*Lab Extract")
-  }
+  all_regions_pattern <- "All[_ ]regions.*Lab[_ ]Extract"
 
-  select_latest_lab_file <- function(matched_files, label) {
-    file_dates <- lubridate::as_date(
-      stringr::str_extract(basename(matched_files), "\\d{4}-\\d{2}-\\d{2}")
-    )
-
-    if (length(matched_files) > 1) {
-      if (any(is.na(file_dates))) {
-        warning("Multiple files found for ", label,
-                " but not all filenames contain a valid YYYY-MM-DD date - using the first: ",
-                basename(matched_files[1]))
-        f <- matched_files[1]
-        file_date <- file_dates[1]
-      } else {
-        file_date <- file_dates[which.max(file_dates)]
-        f <- matched_files[which.max(file_dates)]
-        warning("Multiple files found for ", label, " - using the most recent: ", basename(f))
-      }
-    } else {
-      file_date <- file_dates[1]
-      f <- matched_files[1]
-    }
-
-    if (is.na(file_date)) {
-      file_date <- Sys.Date()
-    }
-
-    list(file = f, file_date = file_date)
-  }
-
-  find_lab_sheet <- function(f, sheet_pattern) {
-    if (!stringr::str_detect(f, stringr::regex("\\.xlsx$", ignore_case = TRUE))) {
-      return(NULL)
-    }
-
-    sheet_names <- readxl::excel_sheets(f)
-    target_sheet <- sheet_names[
-      stringr::str_detect(sheet_names, stringr::regex(sheet_pattern, ignore_case = TRUE))
-    ]
-
-    if (length(target_sheet) == 0 && length(sheet_names) == 1) {
-      target_sheet <- sheet_names[1]
-    }
-
-    if (length(target_sheet) == 0) {
-      warning("No matching Lab data sheet found in ", basename(f))
-      return(NA_character_)
-    }
-
-    target_sheet[1]
-  }
-
-  parse_lab_date_columns <- function(df) {
-    date_cols <- names(df)[
-      stringr::str_detect(names(df), stringr::regex("date", ignore_case = TRUE))
-    ]
-
-    df |>
-      dplyr::mutate(dplyr::across(dplyr::any_of(date_cols), parse_lab_date))
-  }
-
-  # list the files following the pattern "[region] Lab Extract"
+  # list regional or combined lab extracts
   files <- list.files(
     path = lab_data_path,
-    pattern = paste0(region_pattern, ".*\\.(xlsx|csv)$"),
+    pattern = "Lab[_ ]Extract.*\\.(xlsx|csv)$",
     full.names = TRUE,
     ignore.case = TRUE
   )
+  files <- files[!stringr::str_detect(basename(files), "^~\\$")]
 
   if (length(files) == 0) {
     warning("No matching files found in ", lab_data_path)
@@ -431,16 +473,28 @@ prep_lab_data <- function(lab_data_path,
 
   cli::cli_process_start("Extracting data from Excel files")
   if (all_regions) {
-    selected_file <- select_latest_lab_file(files, "all regions")
+    matched_files <- files[stringr::str_detect(
+      basename(files),
+      stringr::regex(all_regions_pattern, ignore_case = TRUE)
+    )]
+
+    if (length(matched_files) == 0) {
+      warning("No all-regions lab extract found in ", lab_data_path)
+      cli::cli_process_done()
+      return(character(0))
+    }
+
+    selected_file <- select_latest_lab_file(matched_files, "all regions")
     f <- selected_file$file
     file_date <- selected_file$file_date
-    sheet_name <- find_lab_sheet(f, "All[_ ]regions.*Lab data|Lab data")
+    sheet_name <- find_lab_sheet(f)
 
     if (length(sheet_name) == 1 && is.na(sheet_name)) {
       cli::cli_process_done()
       return(character(0))
     }
 
+    # Tracked in #328: replace sirfunctions helpers to remove the circular dependency.
     df <- sirfunctions::load_lab_data(f, sheet_name = sheet_name)
 
     region_cols <- c(
@@ -472,7 +526,7 @@ prep_lab_data <- function(lab_data_path,
     for (region in who_regions) {
 
       # find files matching this specific region + "Lab Extract"
-      pattern <- paste0(region, ".*Lab Extract")
+      pattern <- paste0(region, ".*Lab[_ ]Extract")
       matched_files <- files[stringr::str_detect(basename(files), stringr::regex(pattern, ignore_case = TRUE))]
 
       if (length(matched_files) == 0) {
@@ -485,7 +539,7 @@ prep_lab_data <- function(lab_data_path,
       file_date <- selected_file$file_date
 
       # construct the expected sheet name ("[Region] Lab data") if the file is an Excel
-      sheet_name <- find_lab_sheet(f, paste0(region, ".*Lab data"))
+      sheet_name <- find_lab_sheet(f, region = region)
 
       if (length(sheet_name) == 1 && is.na(sheet_name)) {
         next
@@ -501,7 +555,6 @@ prep_lab_data <- function(lab_data_path,
     }
   }
   cli::cli_process_done()
-
   # drop any regions that had no file (keep only successfully read ones)
   lab_data_list <- lab_data_list[!sapply(lab_data_list, is.null)]
 
@@ -552,8 +605,12 @@ prep_lab_data <- function(lab_data_path,
     "DateNotificationtoHQ"
   )
 
-  if (length(dplyr::setdiff(lab_date_cols, names(lab_data))>0)) {
-    cli::cli_alert_info(paste0("Some expected date columns missing from lab data: ", dplyr::setdiff(lab_date_cols, names(lab_data))))
+  missing_date_cols <- setdiff(lab_date_cols, names(lab_data))
+  if (length(missing_date_cols) > 0) {
+    cli::cli_alert_info(paste0("Some expected date columns missing from lab data: ", paste(missing_date_cols, collapse = ", ")))
+    for (column in missing_date_cols) {
+      lab_data[[column]] <- as.Date(NA)
+    }
   }
 
   # look for dates after the date of the extract - using the date of the extract from the filename
@@ -611,24 +668,20 @@ prep_lab_data <- function(lab_data_path,
     ) |>
     dplyr::filter(dplyr::if_any(dplyr::starts_with("flag_") | dplyr::starts_with("bad_")))
 
-  # counts of how many cases had bad dates
-  # dplyr::summarise(lab_checks, dplyr::across(dplyr::starts_with("bad_") | starts_with("flag_"), ~ sum(.x, na.rm = TRUE)))  |>
-  #   tidyr::pivot_longer(cols = dplyr::everything(), names_to = "flag_column", values_to = "n_true")
-
-  # output any data quality issues
-
   # look for any EPIDs that are not in the AFP data
 
   # check if EPID starts with ' and then remove the ' if it is there!
   lab_data <- lab_data |>
     dplyr::mutate(EPID = stringr::str_remove(EPID, "^'"))
 
-  missing_epids <- lab_data |> dplyr::filter(!(EPID %in% afp_data$epid))
-
-  cli::cli_alert_info(paste0("There are ", nrow(missing_epids), " EPIDs in the lab data that are not in the AFP data"))
+  missing_epids <- NULL
+  if (!is.null(afp_data)) {
+    missing_epids <- lab_data |> dplyr::filter(!(EPID %in% afp_data$epid))
+    cli::cli_alert_info(paste0("There are ", nrow(missing_epids), " lab records whose EPIDs are not in the AFP data"))
+  }
 
   # Write QA file for the bad dates for manual review.
-  if(output_lab_checks) {
+  if (output_lab_checks) {
     readr::write_csv(
       lab_checks |>
         dplyr::select(
@@ -636,20 +689,22 @@ prep_lab_data <- function(lab_data_path,
           EPID,
           SpecimenNumber,
           Name,
-          contains("date", ignore.case=TRUE),
-          starts_with("flag_"),
-          starts_with("bad_")),
+          dplyr::contains("date", ignore.case = TRUE),
+          dplyr::starts_with("flag_"),
+          dplyr::starts_with("bad_")),
       paste0("qa_bad_lab_dates_", Sys.Date(), ".csv")
     )
-    readr::write_csv(
-      missing_epids |>
-        dplyr::select(
-          dplyr::any_of(c("source_file", "row_id")),
-          EPID,
-          SpecimenNumber,
-          Name),
-      paste0("qa_missing_epids_", Sys.Date(), ".csv")
-    )
+    if (!is.null(missing_epids)) {
+      readr::write_csv(
+        missing_epids |>
+          dplyr::select(
+            dplyr::any_of(c("source_file", "row_id")),
+            EPID,
+            SpecimenNumber,
+            Name),
+        paste0("qa_missing_epids_", Sys.Date(), ".csv")
+      )
+    }
 
   }
   cli::cli_process_done()
@@ -740,32 +795,41 @@ prep_lab_data <- function(lab_data_path,
   cli::cli_process_done()
 
   # Standardize NULL values
-  # Desired convention:
-  # - FinalITDResult: "NULL" -> blank string ""
-
-  if ("FinalITDResult" %in% names(lab_data)) {
-    lab_data <- lab_data |>
-      dplyr::mutate(
-        FinalITDResult = {
-          x <- as.character(FinalITDResult)
-          x <- trimws(x)
-          x[!is.na(x) & x %in% c("NULL", "null")] <- ""
-          x
-        }
-      )
+  # Desired conventions:
+  # - FinalITDResult and FinalCellCultureResult: "NULL" -> blank string ""
+  # - Empty classification/result fields: "NULL" -> NA
+  null_to_blank <- function(x) {
+    x <- as.character(x)
+    x <- trimws(x)
+    x[!is.na(x) & x %in% c("NULL", "null")] <- ""
+    x
   }
 
-  if ("FinalCellCultureResult" %in% names(lab_data)) {
-    lab_data <- lab_data |>
-      dplyr::mutate(
-        FinalCellCultureResult = {
-          x <- as.character(FinalITDResult)
-          x <- trimws(x)
-          x[!is.na(x) & x %in% c("NULL", "null")] <- ""
-          x
-        }
-      )
+  null_to_na <- function(x) {
+    x <- as.character(x)
+    x <- trimws(x)
+    x[!is.na(x) & x %in% c("NULL", "null")] <- NA_character_
+    x
   }
+
+  lab_data <- lab_data |>
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::any_of(c("FinalITDResult", "FinalCellCultureResult")),
+        null_to_blank
+      ),
+      dplyr::across(
+        dplyr::any_of(c(
+          "CaseContactCode",
+          "ResultNPENT",
+          "WILD1",
+          "VDPV1",
+          "VDPV2",
+          "VDPV3"
+        )),
+        null_to_na
+      )
+    )
   # 3.2 steps from clean_lab_data_regional() ----
 
   # drop EPID/Specimen number duplicates - look for the row with the most complete information
@@ -785,49 +849,24 @@ prep_lab_data <- function(lab_data_path,
     tidyr::fill(ParalysisOnsetDate, DateStoolCollected, .direction = "updown") |>
     dplyr::ungroup()
 
-  # get number of duplicate EPID/Specimen IDs
-  cli::cli_alert_info(paste0("There are ", nrow(missing_epids), " duplicate lab entries."))
+  # Count rows beyond the first in each repeated EPID/specimen combination.
+  duplicate_entries <- sum(duplicated(lab_data_distinct[c("EPID", "SpecimenNumber")]))
+  cli::cli_alert_info(paste0("There are ", duplicate_entries, " duplicate lab entries."))
 
   lab_data_distinct <- lab_data_distinct |>
     # drop any rows that are newly entirely duplicates
     dplyr::distinct() |>
     dplyr::arrange(EPID, SpecimenNumber) |>
-    # # NEW: keep the row with the most complete dates
+    # Count missing dates to break ties between equally recent records.
     dplyr::mutate(missing_dates = rowSums(is.na(dplyr::across(dplyr::all_of(lab_date_cols))))) |>
-    # # NEW: keep the row with the most recent dates
-    # dplyr::rowwise() |>
-    # dplyr::mutate(max_lab_date = max(dplyr::c_across(dplyr::all_of(lab_date_cols)), na.rm = TRUE)) |>
-    # dplyr::ungroup()
-    # the code above was very slow, the syntax below is faster
-    dplyr::mutate(max_lab_date = do.call(pmax, c(dplyr::across(dplyr::all_of(lab_date_cols)), na.rm = TRUE)))
+    dplyr::mutate(max_lab_date = do.call(pmax, c(dplyr::across(dplyr::all_of(lab_date_cols)), na.rm = TRUE))) |>
+    # Prefer the latest date, then the fewest missing dates; input order breaks ties.
+    dplyr::arrange(EPID, SpecimenNumber, dplyr::desc(max_lab_date), missing_dates)
 
-
-  lab_data_distinct <- lab_data_distinct |>
-    # sort within EPID and Specimen number to get the latest date. if multiple rows with the same max date, use the one with the fewest missing dates
-    dplyr::arrange(EPID, SpecimenNumber, desc(max_lab_date), missing_dates)
-
-  # now this is sorted so it chooses the top case with the least number of missing dates (change from how previous clean_lab_data() function worked)
+  # Keep the first ranked row for each EPID/specimen pair.
   lab_data2 <- lab_data_distinct[!duplicated(lab_data_distinct[c("EPID", "SpecimenNumber")]), ]
 
   cli::cli_process_done()
-
-  # track MAD-AND-ABV-22-609 to figure out how to choose the right row to keep
-  # dplyr::filter(lab_data2, EPID=="MAD-AND-ABV-22-609") |>
-  #   dplyr::select(missing_dates,
-  #          SpecimenNumber,
-  #          DateNotificationtoHQ,
-  #          DateofSequencing,
-  #          DateRArmIsolate,
-  #          DateLArmIsolate,
-  #          DateIsolateRcvdForSeq,
-  #          ReportDateSequenceResultSent,
-  #          DateFinalrRTPCRResults,
-  #          DateFinalCellCultureResult,
-  #          DateStoolReceivedinLab,
-  #          StoolDateSentToLab,
-  #          DateStoolCollected,
-  #          ParalysisOnsetDate) |>
-  #   View()
 
   cli::cli_process_start("Creating calculated variables and filtering out negative time intervals")
 
@@ -878,7 +917,7 @@ prep_lab_data <- function(lab_data_path,
                     (days.seq.rec.res >= 0 | is.na(days.seq.rec.res))) |>
     # Filtering nonsensical dates
     dplyr::filter(
-      (DateStoolCollected >= ParalysisOnsetDate | is.na(ParalysisOnsetDate)),
+      (DateStoolCollected >= ParalysisOnsetDate | is.na(DateStoolCollected) | is.na(ParalysisOnsetDate)),
       # remove a blank specimen row
       !is.na(EPID)
     ) |>
@@ -909,9 +948,10 @@ prep_lab_data <- function(lab_data_path,
 
 
   # add lab locs
-  lab_locs <- sirfunctions::get_lab_locs(lab_locs_path, use_edav)
+  # Tracked in #328: replace sirfunctions helpers to remove the circular dependency.
+  lab_locs <- sirfunctions::get_lab_locs(lab_locs_path = lab_locs_path, use_edav = use_edav)
 
-  lab_data3 <- lab_data2 |>
+  lab_data <- lab_data2 |>
     # rename columns for merging
     dplyr::rename(
       country = Name,
@@ -948,16 +988,15 @@ prep_lab_data <- function(lab_data_path,
 
   if (save_to_edav) {
     tidypolis_io(
-      obj = lab_data3,
+      obj = lab_data,
       io = "write",
       file_path = "Data/lab/cleaned_lab_data.rda",
       edav = TRUE,
       object_name = "lab_data"
     )
-  }
-  else {
+  } else {
     cli::cli_alert_info("save_to_edav=FALSE, returning lab data as output object")
-    return(lab_data3)
   }
 
+  lab_data
 }

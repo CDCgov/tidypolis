@@ -35,12 +35,20 @@ prep_lab_data(
 \description{
 Main lab data preparation function.
 Requires Excel files from WHO saved to a local file path.
+<<<<<<< ours
 Expects the names of Excel files to contain the pattern \verb{[Region] Lab Extract}
 and the Sheets within the Excel files to contain the pattern \verb{[Region] Lab data}
 If \code{all_regions = TRUE}, expects one combined extract named \code{All_regions Lab Extract}.
+=======
+Accepts either separate regional extracts or one combined extract. Regional
+filenames should contain \verb{[Region] Lab Extract}; a combined filename only
+needs to contain \verb{Lab Extract}. Excel sheet names should contain \verb{Lab data}.
+>>>>>>> theirs
 }
 \details{
-uploads to EDAV if use_edav = TRUE, otherwise, returns the lab data frame as an output that can be written as a CSV file to a local directory
+The cleaned \code{lab_data} tibble is always returned. If \code{save_to_edav = TRUE},
+it is also written to \code{Data/lab/cleaned_lab_data.rda} in EDAV under the
+internal object name \code{lab_data}.
 
 Will also output a CSV file with cases with implausible dates to the working directory if output_lab_checks=TRUE
 }
