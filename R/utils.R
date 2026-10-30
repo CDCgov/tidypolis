@@ -7442,6 +7442,11 @@ s4_es_write_data <- function(polis_data_folder, es.05, output_folder_name, outpu
 #' This function processes virus data through multiple standardization and
 #' validation steps, including checking for duplicates, standardizing dates,
 #' classifying cases
+#' @details Situation epidemiology geography is assigned after combining human
+#' and environmental detections. Detections on or after January 1, 2025 with
+#' measurement cVDPV 1/2/3, VDPV 1/2/3, or WILD 1 in areas retired in 2025 are
+#' matched to province/district polygons starting in 2026. Other rows retain their
+#' existing geography in the four `sitepi_*` columns. Coordinates may be imputed.
 #'
 #' @param polis_folder `str` Path to the main POLIS folder.
 #' @param latest_folder_in_archive `str` Name of the latest folder in the archive, if one exists.
@@ -7486,6 +7491,15 @@ s5_fully_process_pos_data <- function(polis_folder,
   )
 
   afp.es.virus.01 <- s5_pos_create_final_virus_data(human.virus.05, env.virus.04)
+  sitepi.prov <- tidypolis_io(
+    io = "read", file_path = file.path(polis_folder, "misc", "global.prov.rds")
+  )
+  sitepi.dist <- tidypolis_io(
+    io = "read", file_path = file.path(polis_folder, "misc", "global.dist.rds")
+  )
+  afp.es.virus.01 <- s5_pos_create_sitepi_geography(afp.es.virus.01, sitepi.prov, sitepi.dist)
+  rm(sitepi.prov, sitepi.dist)
+
   afp.es.virus.02 <- remove_character_dates(
     type = "POS", df = afp.es.virus.01,
     output_folder_name = output_folder_name
@@ -7931,11 +7945,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
   afp.01 <- afp.01[!duplicated(afp.01$epid), ] |>
     dplyr::select(
       epid, dateonset, place.admin.0, place.admin.1, place.admin.2, admin0guid, yronset, admin1guid, admin2guid, cdc.classification.all,
-      whoregion, nt.changes, emergence.group, virus.cluster, surveillancetypename, lat, lon, vtype.fixed, datenotificationtohq,
-      sitepi_admin1_name,
-      sitepi_admin1_guid,
-      sitepi_admin2_name,
-      sitepi_admin2_guid
+      whoregion, nt.changes, emergence.group, virus.cluster, surveillancetypename, lat, lon, vtype.fixed, datenotificationtohq
     )
 
   if (length(non.afp.files.01) > 0) {
@@ -7950,11 +7960,7 @@ s5_pos_process_human_virus <- function(virus.01, polis_data_folder, output_folde
 
   # Combine AFP and other surveillance type cases
   afp.02 <- dplyr::bind_rows(afp.01, non.afp.01) |>
-    dplyr::select(epid, lat, lon, datenotificationtohq,
-                  sitepi_admin1_name,
-                  sitepi_admin1_guid,
-                  sitepi_admin2_name,
-                  sitepi_admin2_guid) |>
+    dplyr::select(epid, lat, lon, datenotificationtohq) |>
     dplyr::mutate(datenotificationtohq = parse_date_time(datenotificationtohq, c("%Y-%m-%d", "%d/%m/%Y")))
 
 
@@ -8109,7 +8115,8 @@ s5_pos_process_es_virus <- function(virus.01, polis_data_folder, output_folder_n
 
 
   es.03 <- es.02 |>
-    dplyr::select(env.sample.id, site.id, lat, lon, datenotificationtohq) |>
+    dplyr::select(env.sample.id, site.id, lat, lon, datenotificationtohq,
+                  .sitepi_collection_date = dateonset) |>
     dplyr::rename(epid = env.sample.id)
 
 

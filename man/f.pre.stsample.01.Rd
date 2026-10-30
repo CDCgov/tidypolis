@@ -17,4 +17,9 @@ tibble with lat/lon for all unsampled locations
 \description{
 Create random samples of points for missing GPS data
 }
+\details{
+Situation epidemiology geography (\verb{sitepi_*}) is assigned in Step 5,
+after human and environmental positives are combined. This function supplies
+the processed coordinates, including randomly imputed points, for that lookup.
+}
 \keyword{internal}

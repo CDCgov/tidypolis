@@ -2,9 +2,19 @@
 #' @description Create random samples of points for missing GPS data
 #' @param df01 `tibble` table of afp data
 #' @param global.dist.01 `sf` spatial file of all locations
+#' @details Situation epidemiology geography (`sitepi_*`) is assigned in Step 5,
+#' after human and environmental positives are combined. This function supplies
+#' the processed coordinates, including randomly imputed points, for that lookup.
 #' @returns tibble with lat/lon for all unsampled locations
 #' @keywords internal
 f.pre.stsample.01 <- function(df01, global.dist.01) {
+
+  sitepi_columns <- c(
+    "sitepi_admin1_name", "sitepi_admin1_guid",
+    "sitepi_admin2_name", "sitepi_admin2_guid"
+  )
+  df01 <- df01 |>
+    dplyr::select(-dplyr::any_of(sitepi_columns))
 
   # Add check to see if none of the df01 ADM2GUIDs exist in global.dist.01
   df_01_guid_check <- df01 |>
@@ -75,23 +85,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
   # bind back together df02 and df03
   df04 <- dplyr::bind_rows(df02, df03)
 
-  # get the matched case from the most recent shape file
-  df04_new <- df04 |>
-    dplyr::filter(yr.st == max(yr.st)) |>
-    sf::st_drop_geometry() |>
-    dplyr::as_tibble() |>
-    dplyr::select(epid, Admin2GUID, place.admin.2, Admin1GUID, place.admin.1) |>
-    dplyr::rename(
-      new_admin2_guid = Admin2GUID,
-      new_admin1_guid = Admin1GUID,
-      new_admin1_name = place.admin.1,
-      new_admin2_name = place.admin.2)
-
   cli::cli_process_done()
-
-  # dedupe df04_new in case there is overlapping shapes #
-  df04_new <- df04_new |>
-    dplyr::distinct(epid, .keep_all = T)
 
   # df04 has a lot of dupes due to overlapping shapes, need to appropriately de dupe
   # identify duplicate obs
@@ -157,7 +151,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
 
   # bring df05 and dropped observations back together, create lat/lon var from sf object previously created
   df07 <- dplyr::bind_cols(
-    dplyr::as_tibble(df06),
+    dplyr::as_tibble(sf::st_drop_geometry(df06)),
     sf::st_coordinates(df06) %>%
       {
         if (nrow(df06) == 0) {
@@ -320,17 +314,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
     ))) |>
     dplyr::mutate(geo.corrected = dplyr::if_else(is.na(geo.corrected), 0, geo.corrected)) -> df09
 
-  # Add values in sitepi_* variables if name and GUID changed in the most recent shape file, otherwise NA
-  df10 <- df09 |>
-    dplyr::left_join(df04_new, by = "epid") |>
-    dplyr::mutate(
-        sitepi_admin1_guid = dplyr::if_else(new_admin1_guid != Admin1GUID, new_admin1_guid, NA),
-        sitepi_admin2_guid = dplyr::if_else(new_admin2_guid != Admin2GUID, new_admin2_guid, NA),
-        sitepi_admin1_name = dplyr::if_else(new_admin1_name != place.admin.1, new_admin1_name, NA),
-        sitepi_admin2_name = dplyr::if_else(new_admin2_name != place.admin.2, new_admin2_name, NA)
-      )
-
-  final.guid.check <- df10 |>
+  final.guid.check <- df09 |>
     dplyr::filter((paste0("{", stringr::str_to_upper(admin2guid), "}", sep = "") != Admin2GUID |
                      paste0("{", stringr::str_to_upper(admin1guid), "}", sep = "") != Admin1GUID |
                      paste0("{", stringr::str_to_upper(admin0guid), "}", sep = "") != Admin0GUID) &
@@ -338,7 +322,7 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
     dplyr::select(epid, yronset, place.admin.0, place.admin.1, place.admin.2, admin0guid, admin1guid, admin2guid, Admin0GUID, Admin1GUID, Admin2GUID, geo.corrected)
 
 
-  final.names.check <- df10 |>
+  final.names.check <- df09 |>
     dplyr::select(epid, yronset, place.admin.0, place.admin.1, place.admin.2, admin0guid, admin1guid, admin2guid, Admin0GUID, Admin1GUID, Admin2GUID, geo.corrected) |>
     dplyr::filter((is.na(place.admin.0) & !is.na(admin0guid)) |
                     (is.na(place.admin.1) & !is.na(admin1guid)) |
@@ -351,5 +335,5 @@ f.pre.stsample.01 <- function(df01, global.dist.01) {
     rm(final.names.check, final.guid.check)
   }
 
-  return(df10)
+  return(df09)
 }

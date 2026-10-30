@@ -41,3 +41,10 @@ This function processes virus data through multiple standardization and
 validation steps, including checking for duplicates, standardizing dates,
 classifying cases
 }
+\details{
+Situation epidemiology geography is assigned after combining human
+and environmental detections. Detections on or after January 1, 2025 with
+measurement cVDPV 1/2/3, VDPV 1/2/3, or WILD 1 in areas retired in 2025 are
+matched to province/district polygons starting in 2026. Other rows retain their
+existing geography in the four \verb{sitepi_*} columns. Coordinates may be imputed.
+}
