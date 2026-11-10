@@ -13,6 +13,8 @@
 #' @param full_names `logical` If you want to include the full reference path in the response, default `FALSE`.
 #' @param edav_default_dir `str` If `edav = TRUE`, specify the default directory used for `sirfunctions::edav_io()`.
 #' By default, this is `"GID/PEB/SIR"`.
+#' @param object_name `str` Optional name to store inside an RDA file. This is
+#' ignored for other file formats.
 #'
 #' @returns Conditional on `io`. If `io` is "read", then it will return a tibble. If `io` is `"list"`, it will return a
 #' list of file names. Otherwise, the function will return `NULL`. `exists.dir` and `exists.file` will return a `logical`.
@@ -24,7 +26,8 @@ tidypolis_io <- function(
     edav = as.logical(Sys.getenv("POLIS_EDAV_FLAG")),
     azcontainer = suppressMessages(sirfunctions::get_azure_storage_connection()),
     full_names = F,
-    edav_default_dir = "GID/PEB/SIR") {
+    edav_default_dir = "GID/PEB/SIR",
+    object_name = NULL) {
   opts <- c("read", "write", "delete", "list", "exists.dir", "exists.file", "create")
 
   if (!io %in% opts) {
@@ -131,7 +134,25 @@ tidypolis_io <- function(
       stop("You need to include an object to be written.")
     }
 
-    if (edav) {
+    if (edav && grepl("\\.rda$", file_path) && !is.null(object_name)) {
+      if (!requireNamespace("AzureStor", quietly = TRUE)) {
+        stop('Package "AzureStor" must be installed to write RDA files to EDAV.',
+             .call = FALSE)
+      }
+
+      rda_file <- tempfile(fileext = ".rda")
+      on.exit(unlink(rda_file), add = TRUE)
+      rda_env <- new.env(parent = emptyenv())
+      assign(object_name, obj, envir = rda_env)
+      save(list = object_name, file = rda_file, envir = rda_env)
+
+      AzureStor::storage_upload(
+        container = azcontainer,
+        src = rda_file,
+        dest = paste(edav_default_dir, file_path, sep = "/"),
+        overwrite = TRUE
+      )
+    } else if (edav) {
       sirfunctions::edav_io(
         io = "write",
         default_dir = edav_default_dir,
@@ -148,7 +169,12 @@ tidypolis_io <- function(
       }
 
       if (grepl("\\.rda$", file_path)) {
-        save(list = obj, file = file_path)
+        if (is.null(object_name)) {
+          object_name <- "obj"
+        }
+        rda_env <- new.env(parent = emptyenv())
+        assign(object_name, obj, envir = rda_env)
+        save(list = object_name, file = file_path, envir = rda_env)
       }
 
       if (grepl("\\.csv$", file_path)) {

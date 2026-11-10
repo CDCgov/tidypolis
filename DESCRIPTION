@@ -33,7 +33,8 @@ Imports:
     utils,
     lifecycle,
     tools,
-    arrow
+    arrow,
+    readxl
 Suggests:
     httpuv,
     fs,
