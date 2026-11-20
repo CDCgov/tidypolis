@@ -107,5 +107,7 @@ utils::globalVariables(c(
   "no.of.shapes", "report_date", "DosesOPVNumber", "geo.corrected", "wrongAdmin0GUID",
   "Admin 0 Id", "Admin 1 Id", "Admin 2 Id", "WHO Region", "WHORegion", "X",
   "cluster", "datasource", "epid_fixed", "file_name", "value", "old", "new",
-  "y"
+  "y", "geo.review", ".geo_case_id", ".geo_shape_id", ".geo_source_country",
+  ".geo_source_name", ".geo_expected_country", ".geo_expected_name",
+  ".geo_name", ".geo_district_match", ".geo_n"
 ))
