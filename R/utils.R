@@ -5204,22 +5204,11 @@ s2_create_afp_variables <- function(data) {
           is.na(timeto60day) == TRUE) ~ 0
       ),
 
-      # Format GUID strings
-      adm0guid = paste("{",
-        stringr::str_to_upper(admin0guid), "}",
-        sep = ""
-      ),
-      adm0guid = dplyr::if_else(
-        adm0guid == "{}" | adm0guid == "{NA}", NA, adm0guid
-      ),
-      adm1guid = paste("{", stringr::str_to_upper(admin1guid), "}", sep = ""),
-      adm1guid = dplyr::if_else(
-        adm1guid == "{}" | adm1guid == "{NA}", NA, adm1guid
-      ),
-      adm2guid = paste("{", stringr::str_to_upper(admin2guid), "}", sep = ""),
-      adm2guid = dplyr::if_else(
-        adm2guid == "{}" | adm2guid == "{NA}", NA, adm2guid
-      )
+      # Export the corrected hierarchy paired with place.admin.*. The original
+      # admin*guid fields remain available for auditing.
+      adm0guid = Admin0GUID,
+      adm1guid = Admin1GUID,
+      adm2guid = Admin2GUID
     ) |>
     # Rename variables for consistency with existing naming conventions
     dplyr::rename_with(recode,

@@ -12,9 +12,17 @@ f.pre.stsample.01(df01, global.dist.01)
 \item{global.dist.01}{\code{sf} spatial file of all locations}
 }
 \value{
-tibble with lat/lon for all unsampled locations
+A tibble with corrected \code{Admin*GUID} fields, \code{lat}, \code{lon},
+\code{geo.corrected}, and a \code{geo.review} reason (\code{NA} for accepted matches).
 }
 \description{
-Create random samples of points for missing GPS data
+Validate AFP geography and sample points for missing GPS data.
+}
+\details{
+District matches must agree with the source country name/GUID and
+onset year. An existing district GUID resolves overlaps within that country;
+unresolved matches retain their input geography and receive a \code{geo.review}
+reason. Names and corrected GUIDs come from the same accepted reference row.
+Original \code{admin0guid}, \code{admin1guid}, and \code{admin2guid} values are retained.
 }
 \keyword{internal}
